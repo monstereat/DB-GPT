@@ -1,0 +1,5 @@
+{
+  "2026 Q2 sales by region": "SELECT region, SUM(revenue) AS sales FROM orders WHERE created_at >= '2026-04-01' AND created_at < '2026-07-01' GROUP BY region ORDER BY sales DESC",
+  "2026 Q2 refund amount by region": "SELECT o.region, SUM(r.amount) AS refunded FROM refunds AS r JOIN orders AS o ON r.order_id = o.id WHERE r.created_at >= '2026-04-01' AND r.created_at < '2026-07-01' GROUP BY o.region ORDER BY refunded DESC",
+  "2026 Q2 order count": "SELECT COUNT(*) AS total FROM orders WHERE created_at >= '2026-04-01' AND created_at < '2026-07-01'"
+}
