@@ -1,0 +1,22 @@
+name: develop-me guarded SQL MVP
+on:
+  push:
+    branches: [develop-me]
+    paths:
+      - 'examples/enterprise-text2sql/**'
+      - '.github/workflows/develop-me-sql-guard.yml'
+  workflow_dispatch:
+jobs:
+  sql-guard-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install minimal test requirements
+        run: python -m pip install pytest
+      - name: Run standalone SQLite security tests
+        working-directory: examples/enterprise-text2sql
+        run: python -m pytest -q -o addopts=''
