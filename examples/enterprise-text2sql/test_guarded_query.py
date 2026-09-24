@@ -185,10 +185,17 @@ def test_tenant_scope_does_not_expose_tenant_or_sensitive_columns(tmp_path):
     for query in (
         "SELECT tenant_id FROM orders",
         "SELECT internal_note FROM orders",
-        "SELECT * FROM orders",
     ):
         with pytest.raises(QueryRejected):
             executor.run(query)
+
+    # In tenant-scoped mode, orders resolves to a trusted projection view.
+    # SELECT * is safe here: the view exposes only the explicitly allowed columns.
+    star = executor.run("SELECT * FROM orders")
+    assert star["columns"] == ["id", "revenue"]
+    assert star["rows"] == [[1, 100]]
+    assert "secret" not in str(star)
+    assert "tenant-a" not in str(star)
 
 
 def test_tenant_mode_requires_complete_server_side_policy(tmp_path):
