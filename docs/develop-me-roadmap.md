@@ -67,3 +67,10 @@ python -m pytest -q
 ```
 
 **当前限制：** 已提交的是独立 SQLite 安全执行器，不是生产级 SQL 防火墙；尚未接入 DB-GPT 默认执行管线、真实企业 RBAC、生产数据库、Vue3 前端或标准业务评测集。[x] 表示对应代码已提交，不代表 CI 或真实环境测试已通过。
+
+## 2026-09-24 增量：固定数据集候选 SQL 评测
+
+- [x] `examples/enterprise-text2sql/evaluate_candidates.py` 接收每个标准问题对应的候选 SQL，全部通过既有 `GuardedSQLiteQuery` 执行。
+- [x] 统计结果正确、结果错误、被拒绝、缺失的数量与比例；报告只包含 SQL 哈希和安全指标，不回显 SQL 或查询明细。
+- [x] 提交 `gold_candidates.json` 和评测回归测试；专用 GitHub Actions 已成功。
+- [ ] **评测范围尚有限：** 当前仅有 3 个已知答案的合成电商问题，尚不是模型生成 SQL 的真实准确率；下一步扩展到 30–50 条标准问题，接入 DB-GPT 真实 Agent，再通过独立权限与指标口径回归。
