@@ -121,3 +121,97 @@ def test_audit_event_contains_hash_not_raw_sql(tmp_path):
     assert event["allowed_tables"] == ["orders"]
     assert len(event["query_sha256"]) == 64
     assert "sql" not in event
+
+
+def test_tenant_scope_filters_rows_and_blocks_direct_main_table_access(tmp_path):
+    db = tmp_path / "tenant.sqlite"
+    with sqlite3.connect(db) as conn:
+        conn.executescript(
+            """
+            CREATE TABLE orders (
+                id INTEGER PRIMARY KEY,
+                tenant_id TEXT NOT NULL,
+                region TEXT,
+                revenue INTEGER,
+                internal_note TEXT
+            );
+            INSERT INTO orders (tenant_id, region, revenue, internal_note) VALUES
+                ('tenant-a', 'Guangzhou', 100, 'a-only'),
+                ('tenant-b', 'Shanghai', 900, 'b-only'),
+                ('tenant-a', 'Shenzhen', 200, 'a-only-2');
+            """
+        )
+
+    tenant_a = GuardedSQLiteQuery(
+        db,
+        {"orders"},
+        allowed_columns={"orders": {"id", "region", "revenue"}},
+        tenant_id="tenant-a",
+        tenant_columns={"orders": "tenant_id"},
+        max_rows=10,
+    )
+
+    result = tenant_a.run("SELECT region, revenue FROM orders ORDER BY id")
+    assert result["rows"] == [["Guangzhou", 100], ["Shenzhen", 200]]
+
+    with pytest.raises(QueryRejected):
+        tenant_a.run("SELECT region FROM main.orders")
+
+
+def test_tenant_scope_does_not_expose_tenant_or_sensitive_columns(tmp_path):
+    db = tmp_path / "tenant-columns.sqlite"
+    with sqlite3.connect(db) as conn:
+        conn.executescript(
+            """
+            CREATE TABLE orders (
+                id INTEGER,
+                tenant_id TEXT,
+                revenue INTEGER,
+                internal_note TEXT
+            );
+            INSERT INTO orders VALUES (1, 'tenant-a', 100, 'secret');
+            """
+        )
+
+    executor = GuardedSQLiteQuery(
+        db,
+        {"orders"},
+        allowed_columns={"orders": {"id", "revenue"}},
+        tenant_id="tenant-a",
+        tenant_columns={"orders": "tenant_id"},
+    )
+    assert executor.run("SELECT id, revenue FROM orders")["rows"] == [[1, 100]]
+
+    for query in (
+        "SELECT tenant_id FROM orders",
+        "SELECT internal_note FROM orders",
+        "SELECT * FROM orders",
+    ):
+        with pytest.raises(QueryRejected):
+            executor.run(query)
+
+
+def test_tenant_mode_requires_complete_server_side_policy(tmp_path):
+    db = tmp_path / "tenant-policy.sqlite"
+    with sqlite3.connect(db) as conn:
+        conn.executescript(
+            "CREATE TABLE orders (tenant_id TEXT, id INTEGER);"
+            "CREATE TABLE refunds (tenant_id TEXT, id INTEGER);"
+        )
+
+    with pytest.raises(ValueError):
+        GuardedSQLiteQuery(
+            db,
+            {"orders", "refunds"},
+            allowed_columns={"orders": {"id"}, "refunds": {"id"}},
+            tenant_id="tenant-a",
+            tenant_columns={"orders": "tenant_id"},
+        )
+
+    with pytest.raises(ValueError):
+        GuardedSQLiteQuery(
+            db,
+            {"orders"},
+            tenant_id="tenant-a",
+            tenant_columns={"orders": "tenant_id"},
+        )
