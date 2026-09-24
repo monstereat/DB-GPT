@@ -38,6 +38,8 @@ class GuardedSQLiteQuery:
         allowed_tables: set[str] | frozenset[str],
         *,
         allowed_columns: Mapping[str, set[str] | frozenset[str]] | None = None,
+        tenant_id: str | None = None,
+        tenant_columns: Mapping[str, str] | None = None,
         max_rows: int = 100,
         timeout_ms: int = 2000,
         audit_sink: AuditSink | None = None,
@@ -59,6 +61,25 @@ class GuardedSQLiteQuery:
             raise ValueError("Column policy references tables outside the table allowlist")
         if any(not columns for columns in self.allowed_columns.values()):
             raise ValueError("Column allowlists must be nonempty")
+        self.tenant_id = tenant_id
+        self.tenant_columns = dict(tenant_columns or {})
+        if tenant_id is None and self.tenant_columns:
+            raise ValueError("Tenant columns require a server-owned tenant ID")
+        if tenant_id is not None:
+            if not isinstance(tenant_id, str) or not tenant_id:
+                raise ValueError("A nonempty server-owned tenant ID is required")
+            if set(self.tenant_columns) != self.allowed_tables:
+                raise ValueError("Every allowed table needs a tenant column")
+            if set(self.allowed_columns) != self.allowed_tables:
+                raise ValueError("Tenant-scoped mode requires explicit column allowlists")
+            identifiers = [
+                *self.allowed_tables,
+                *self.tenant_columns.values(),
+                *(col for cols in self.allowed_columns.values() for col in cols),
+            ]
+            if any(not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,63}", x)
+                   for x in identifiers):
+                raise ValueError("Tenant-scoped mode requires simple SQL identifiers")
         self.max_rows = max_rows
         self.timeout_ms = timeout_ms
         self.audit_sink = audit_sink
@@ -105,32 +126,62 @@ class GuardedSQLiteQuery:
 
         try:
             with sqlite3.connect(db_uri, uri=True) as conn:
-                conn.execute("PRAGMA query_only = ON")
                 conn.execute("PRAGMA trusted_schema = OFF")
+                if self.tenant_id is not None:
+                    # A TEMP view shadows every exposed main table. The tenant
+                    # value is stored in the connection, not interpolated into SQL.
+                    conn.create_function(
+                        "current_tenant", 0, lambda: self.tenant_id,
+                    )
+                    for table in sorted(self.allowed_tables):
+                        selected = ", ".join(
+                            '"' + col + '"'
+                            for col in sorted(self.allowed_columns[table])
+                        )
+                        tenant_col = '"' + self.tenant_columns[table] + '"'
+                        conn.execute(
+                            f'CREATE TEMP VIEW "{table}" AS SELECT {selected} '
+                            f'FROM main."{table}" '
+                            f'WHERE {tenant_col} = current_tenant()'
+                        )
+                conn.execute("PRAGMA query_only = ON")
 
                 def authorize(
                     action: int,
                     arg1: str | None,
                     arg2: str | None,
-                    _db: str | None,
-                    _trigger: str | None,
+                    db: str | None,
+                    source: str | None,
                 ) -> int:
                     if action == sqlite3.SQLITE_READ:
                         if arg1 not in self.allowed_tables:
                             return sqlite3.SQLITE_DENY
                         columns = self.allowed_columns.get(arg1)
-                        # arg2 is the column name for SQLITE_READ.
+                        if self.tenant_id is not None:
+                            if db == "main":
+                                # Only the trusted TEMP view may read raw tenant
+                                # rows; a direct "main.table" query is denied.
+                                if source != arg1:
+                                    return sqlite3.SQLITE_DENY
+                                allowed = columns | {self.tenant_columns[arg1]}
+                                return (sqlite3.SQLITE_OK if arg2 in allowed or arg2 == ""
+                                        else sqlite3.SQLITE_DENY)
+                            if db != "temp":
+                                return sqlite3.SQLITE_DENY
+                        # Empty arg2 is SQLite's implicit read for count/limit.
                         if columns is not None and arg2 not in columns and arg2 != "":
                             return sqlite3.SQLITE_DENY
                         return sqlite3.SQLITE_OK
                     if action == sqlite3.SQLITE_SELECT:
                         return sqlite3.SQLITE_OK
                     if action == sqlite3.SQLITE_FUNCTION:
-                        return (
-                            sqlite3.SQLITE_OK
-                            if (arg2 or "").lower() in _ALLOWED_FUNCTIONS
-                            else sqlite3.SQLITE_DENY
-                        )
+                        name = (arg2 or "").lower()
+                        if name == "current_tenant":
+                            return (sqlite3.SQLITE_OK if self.tenant_id is not None
+                                    and source in self.allowed_tables
+                                    else sqlite3.SQLITE_DENY)
+                        return (sqlite3.SQLITE_OK if name in _ALLOWED_FUNCTIONS
+                                else sqlite3.SQLITE_DENY)
                     return sqlite3.SQLITE_DENY
 
                 conn.set_authorizer(authorize)
