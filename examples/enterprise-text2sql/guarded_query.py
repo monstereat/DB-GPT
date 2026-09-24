@@ -120,7 +120,7 @@ class GuardedSQLiteQuery:
                             return sqlite3.SQLITE_DENY
                         columns = self.allowed_columns.get(arg1)
                         # arg2 is the column name for SQLITE_READ.
-                        if columns is not None and arg2 not in columns:
+                        if columns is not None and arg2 not in columns and arg2 != "":
                             return sqlite3.SQLITE_DENY
                         return sqlite3.SQLITE_OK
                     if action == sqlite3.SQLITE_SELECT:
