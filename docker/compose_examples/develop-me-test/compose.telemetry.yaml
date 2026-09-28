@@ -1,0 +1,16 @@
+services:
+  dbgpt:
+    environment:
+      TRACER_TO_OPEN_TELEMETRY: "true"
+      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: http://jaeger:4317
+      OTEL_EXPORTER_OTLP_TRACES_INSECURE: "true"
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.58
+    profiles: [telemetry]
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+      SPAN_STORAGE_TYPE: memory
+    ports:
+      - "127.0.0.1:16687:16686"
+    restart: unless-stopped

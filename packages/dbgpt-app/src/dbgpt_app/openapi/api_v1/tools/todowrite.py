@@ -5,6 +5,8 @@ from typing import Callable, Dict, List
 
 from dbgpt.agent.resource.tool.base import tool
 
+from .tool_tracing import trace_agent_tool
+
 
 def make_todowrite(
     todo_list: List[Dict[str, str]],
@@ -28,6 +30,7 @@ def make_todowrite(
             '"priority": "..."}]}'
         )
     )
+    @trace_agent_tool("agent.todowrite")
     def todowrite(todos: str) -> str:
         """Update the session todo list (full replacement)."""
         parsed: List[Dict[str, str]] = []

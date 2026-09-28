@@ -4,6 +4,13 @@ on:
     branches: [develop-me]
     paths:
       - 'examples/enterprise-text2sql/**'
+      - 'packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/agentic_data_api.py'
+      - 'packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/token_quota.py'
+      - 'packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tests/test_token_quota.py'
+      - 'packages/dbgpt-app/src/dbgpt_app/initialization/db_model_initialization.py'
+      - 'packages/dbgpt-serve/src/dbgpt_serve/token_quota/**'
+      - 'assets/schema/dbgpt.sql'
+      - 'assets/schema/upgrade/v0_8_2/**'
       - '.github/workflows/develop-me-sql-guard.yml'
   workflow_dispatch:
 jobs:
@@ -15,8 +22,17 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Install minimal test requirements
-        run: python -m pip install pytest
-      - name: Run standalone SQLite security tests
+      - name: Install enterprise Text-to-SQL test requirements
+        run: python -m pip install -r examples/enterprise-text2sql/requirements-test.txt
+      - name: Run enterprise Text-to-SQL suite
         working-directory: examples/enterprise-text2sql
+        env:
+          PYTHONPATH: ../../packages/dbgpt-core/src:../../packages/dbgpt-serve/src:../../packages/dbgpt-ext/src
         run: python -m pytest -q -o addopts=''
+      - name: Run persistent token quota tests
+        env:
+          PYTHONPATH: packages/dbgpt-core/src:packages/dbgpt-serve/src:packages/dbgpt-ext/src:packages/dbgpt-app/src
+        run: >-
+          python -m pytest -q -o addopts=''
+          packages/dbgpt-serve/src/dbgpt_serve/token_quota/tests/test_dao.py
+          packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tests/test_token_quota.py

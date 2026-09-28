@@ -3,7 +3,7 @@ import json
 import logging
 import time
 from abc import ABC
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Callable, Dict, List, Optional, Type
 
 from fastapi import APIRouter
 
@@ -170,6 +170,8 @@ class MultiAgents(BaseComponent, ABC):
         sys_code: str = None,
         enable_verbose: bool = True,
         stream: Optional[bool] = True,
+        trusted_execution_context: Optional[Dict[str, Any]] = None,
+        llm_client_wrapper: Optional[Callable[[Any], Any]] = None,
         **ext_info,
     ):
         logger.info(
@@ -332,6 +334,8 @@ class MultiAgents(BaseComponent, ABC):
                     init_message_rounds=message_round,
                     enable_verbose=enable_verbose,
                     historical_dialogues=historical_dialogues,
+                    trusted_execution_context=trusted_execution_context,
+                    llm_client_wrapper=llm_client_wrapper,
                     **ext_info,
                 )
             )
@@ -481,6 +485,56 @@ class MultiAgents(BaseComponent, ABC):
         sys_code: str = None,
         enable_verbose: bool = True,
         stream: Optional[bool] = True,
+        trusted_execution_context: Optional[Dict[str, Any]] = None,
+        llm_client_wrapper: Optional[Callable[[Any], Any]] = None,
+        **ext_info,
+    ):
+        """Run an App Agent with a request-scoped wrapper for nested clients."""
+        if llm_client_wrapper is None:
+            async for chunk in self._app_agent_chat_impl(
+                conv_uid=conv_uid,
+                gpts_name=gpts_name,
+                user_query=user_query,
+                user_code=user_code,
+                sys_code=sys_code,
+                enable_verbose=enable_verbose,
+                stream=stream,
+                trusted_execution_context=trusted_execution_context,
+                **ext_info,
+            ):
+                yield chunk
+            return
+
+        from dbgpt.core.interface.operators.llm_operator import (
+            scoped_llm_client_wrapper,
+        )
+
+        with scoped_llm_client_wrapper(llm_client_wrapper):
+            async for chunk in self._app_agent_chat_impl(
+                conv_uid=conv_uid,
+                gpts_name=gpts_name,
+                user_query=user_query,
+                user_code=user_code,
+                sys_code=sys_code,
+                enable_verbose=enable_verbose,
+                stream=stream,
+                trusted_execution_context=trusted_execution_context,
+                llm_client_wrapper=llm_client_wrapper,
+                **ext_info,
+            ):
+                yield chunk
+
+    async def _app_agent_chat_impl(
+        self,
+        conv_uid: str,
+        gpts_name: str,
+        user_query: str,
+        user_code: str = None,
+        sys_code: str = None,
+        enable_verbose: bool = True,
+        stream: Optional[bool] = True,
+        trusted_execution_context: Optional[Dict[str, Any]] = None,
+        llm_client_wrapper: Optional[Callable[[Any], Any]] = None,
         **ext_info,
     ):
         # logger.info(f"app_agent_chat:{gpts_name},{user_query},{conv_uid}")
@@ -499,6 +553,7 @@ class MultiAgents(BaseComponent, ABC):
                     sys_code,
                     enable_verbose=enable_verbose,
                     stream=stream,
+                    llm_client_wrapper=llm_client_wrapper,
                     **ext_info,
                 ):
                     agent_task = task
@@ -554,6 +609,8 @@ class MultiAgents(BaseComponent, ABC):
                     sys_code,
                     enable_verbose=enable_verbose,
                     stream=stream,
+                    trusted_execution_context=trusted_execution_context,
+                    llm_client_wrapper=llm_client_wrapper,
                     **ext_info,
                 ):
                     agent_task = task
@@ -596,6 +653,8 @@ class MultiAgents(BaseComponent, ABC):
         enable_verbose: bool = True,
         historical_dialogues: Optional[List[GptsMessage]] = None,
         rely_messages: Optional[List[GptsMessage]] = None,
+        trusted_execution_context: Optional[Dict[str, Any]] = None,
+        llm_client_wrapper: Optional[Callable[[Any], Any]] = None,
         **ext_info,
     ):
         gpts_status = Status.COMPLETE.value
@@ -625,6 +684,8 @@ class MultiAgents(BaseComponent, ABC):
             self.llm_provider = DefaultLLMClient(
                 worker_manager, auto_convert_message=True
             )
+            if llm_client_wrapper is not None:
+                self.llm_provider = llm_client_wrapper(self.llm_provider)
 
             for record in gpts_app.details:
                 cls: Type[ConversableAgent] = self.agent_manage.get_by_name(
@@ -641,7 +702,10 @@ class MultiAgents(BaseComponent, ABC):
                         prompt_code=record.prompt_template
                     )
                 depend_resource = await blocking_func_to_async(
-                    CFG.SYSTEM_APP, rm.build_resource, record.resources
+                    CFG.SYSTEM_APP,
+                    rm.build_resource,
+                    record.resources,
+                    trusted_execution_context=trusted_execution_context,
                 )
                 agent = (
                     await cls()

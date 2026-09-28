@@ -11,10 +11,10 @@ their dependency sources changed (closure free variables -> factory params or
 module-level imports). Behavior is identical, so existing conversations
 regress identically.
 
-Returns 8 tools::
+Returns 10 tools::
 
     load_skill / load_tools / knowledge_retrieve / sql_query /
-    code_interpreter / shell_interpreter / execute_skill_script_file /
+    metric_query / code_interpreter / shell_interpreter / execute_skill_script_file /
     html_interpreter
 
 ``todowrite`` is intentionally NOT here — it shares ``_todo_list`` with the
@@ -27,6 +27,8 @@ import json
 import logging
 import os
 import re
+import time
+from functools import wraps
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -35,6 +37,17 @@ from dbgpt.agent.resource.base import AgentResource, ResourceType
 from dbgpt.agent.resource.manage import get_resource_manager
 from dbgpt.agent.resource.tool.base import tool
 from dbgpt.configs.model_config import SKILLS_DIR
+from dbgpt.datasource.sql_guard import (
+    SQLQueryFailure,
+    consume_sql_correction_budget,
+    emit_agent_sql_audit,
+    execute_read_only_query,
+    reset_sql_correction_budget,
+)
+from dbgpt.util.tracer import SpanType, root_tracer
+from dbgpt_app.openapi.api_v1.business_context import prepare_database_query
+from dbgpt_app.openapi.api_v1.tools.metric_catalog import make_metric_catalog
+from dbgpt_app.openapi.api_v1.tools.metric_query import make_metric_query
 
 CFG = Config()
 logger = logging.getLogger(__name__)
@@ -67,6 +80,20 @@ def _extract_auto_data_markers(text: str) -> tuple[str, Dict[str, str]]:
     cleaned = AUTO_DATA_MARKER_PATTERN.sub(_replace, text)
     cleaned = re.sub(r"\n{3,}", "\n\n", cleaned).strip()
     return cleaned, extracted
+
+
+def _sql_result_value(value: Any) -> Any:
+    """Convert database values to a JSON-safe representation for the UI."""
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if hasattr(value, "isoformat"):
+        return value.isoformat()
+    if hasattr(value, "item"):
+        try:
+            return _sql_result_value(value.item())
+        except (TypeError, ValueError):
+            pass
+    return str(value)
 
 
 def _try_repair_truncated_code(raw_code: str) -> Optional[str]:
@@ -137,9 +164,10 @@ def make_react_tools(
             Used by ``knowledge_retrieve``.
 
     Returns:
-        A dict mapping tool name -> tool callable, with 8 entries:
+        A dict mapping tool name -> tool callable, with 10 entries:
         ``load_skill``, ``load_tools``, ``knowledge_retrieve``, ``sql_query``,
-        ``code_interpreter``, ``shell_interpreter``,
+        ``metric_catalog``, ``metric_query``, ``code_interpreter``,
+        ``shell_interpreter``,
         ``execute_skill_script_file``, ``html_interpreter``.
     """
 
@@ -256,23 +284,42 @@ def make_react_tools(
         'in the knowledge base. Parameters: {{"query": "search query"}}'
     )
     async def knowledge_retrieve(query: str) -> str:
-        if not knowledge_resources:
-            return json.dumps(
-                {
-                    "chunks": [
-                        {
-                            "output_type": "text",
-                            "content": "No knowledge base available",
-                        }
-                    ]
-                },
-                ensure_ascii=False,
-            )
-
-        resource = knowledge_resources[0]
+        started_at = time.monotonic()
+        span = None
+        status = "failed"
+        result_count = 0
         try:
+            try:
+                span = root_tracer.start_span(
+                    "agent.knowledge_retrieve",
+                    span_type=SpanType.AGENT,
+                    metadata={
+                        "conv_id": react_state.get("conv_id"),
+                        "data_source_id": react_state.get("data_source_id"),
+                    },
+                )
+            except Exception:
+                logger.debug("Unable to start knowledge retrieval span", exc_info=True)
+
+            if not knowledge_resources:
+                status = "resource_missing"
+                return json.dumps(
+                    {
+                        "chunks": [
+                            {
+                                "output_type": "text",
+                                "content": "No knowledge base available",
+                            }
+                        ]
+                    },
+                    ensure_ascii=False,
+                )
+
+            resource = knowledge_resources[0]
             chunks = await resource.retrieve(query)
             if chunks:
+                result_count = len(chunks)
+                status = "succeeded"
                 content = "\n".join(
                     [f"[{i + 1}] {chunk.content}" for i, chunk in enumerate(chunks[:5])]
                 )
@@ -291,6 +338,7 @@ def make_react_tools(
                     ensure_ascii=False,
                 )
             else:
+                status = "empty"
                 return json.dumps(
                     {
                         "chunks": [
@@ -314,6 +362,159 @@ def make_react_tools(
                 },
                 ensure_ascii=False,
             )
+        finally:
+            if span is not None:
+                try:
+                    root_tracer.end_span(
+                        span,
+                        metadata={
+                            "conv_id": react_state.get("conv_id"),
+                            "data_source_id": react_state.get("data_source_id"),
+                            "status": status,
+                            "result_count": result_count,
+                            "elapsed_ms": int((time.monotonic() - started_at) * 1000),
+                        },
+                    )
+                except Exception:
+                    logger.debug(
+                        "Unable to end knowledge retrieval span", exc_info=True
+                    )
+
+    def trace_sql_query(function):
+        @wraps(function)
+        def traced(sql: str) -> str:
+            started_at = time.monotonic()
+            span = None
+            status = "failed"
+            category = None
+            returned_rows = None
+            try:
+                try:
+                    span = root_tracer.start_span(
+                        "agent.sql_query",
+                        span_type=SpanType.AGENT,
+                        metadata={
+                            key: react_state.get(key)
+                            for key in (
+                                "conv_id",
+                                "actor_user_id",
+                                "tenant_id",
+                                "region_id",
+                                "role",
+                                "data_source_id",
+                                "authorization_policy_version",
+                            )
+                            if react_state.get(key) is not None
+                        },
+                    )
+                except Exception:
+                    logger.debug("Unable to start SQL query span", exc_info=True)
+
+                result = function(sql)
+                try:
+                    payload = json.loads(result)
+                except (TypeError, ValueError):
+                    payload = {}
+                error = payload.get("error")
+                if isinstance(error, dict):
+                    status = "rejected" if not error.get("retryable") else "failed"
+                    category = error.get("category")
+                elif payload.get("result", {}).get("type") == "sql_result":
+                    status = "succeeded"
+                    returned_rows = payload["result"].get("row_count")
+                elif "未选择数据库" in str(payload.get("chunks", "")):
+                    status = "not_executed"
+                else:
+                    status = "empty"
+                return result
+            finally:
+                if span is not None:
+                    try:
+                        root_tracer.end_span(
+                            span,
+                            metadata={
+                                "status": status,
+                                "category": category,
+                                "returned_rows": returned_rows,
+                                "elapsed_ms": int(
+                                    (time.monotonic() - started_at) * 1000
+                                ),
+                            },
+                        )
+                    except Exception:
+                        logger.debug("Unable to end SQL query span", exc_info=True)
+
+        return traced
+
+    def trace_async_tool(operation_name: str):
+        def decorate(function):
+            @wraps(function)
+            async def traced(*args, **kwargs):
+                started_at = time.monotonic()
+                span = None
+                status = "failed"
+                chunk_count = 0
+                output_types = []
+                try:
+                    try:
+                        span = root_tracer.start_span(
+                            operation_name,
+                            span_type=SpanType.AGENT,
+                            metadata={
+                                key: react_state.get(key)
+                                for key in (
+                                    "conv_id",
+                                    "actor_user_id",
+                                    "role",
+                                    "tenant_id",
+                                    "region_id",
+                                    "data_source_id",
+                                    "authorization_policy_version",
+                                )
+                                if react_state.get(key) is not None
+                            },
+                        )
+                    except Exception:
+                        logger.debug("Unable to start Agent tool span", exc_info=True)
+
+                    result = await function(*args, **kwargs)
+                    try:
+                        payload = json.loads(result)
+                    except (TypeError, ValueError):
+                        payload = {}
+                    chunks = payload.get("chunks", [])
+                    if isinstance(chunks, list):
+                        chunk_count = len(chunks)
+                        output_types = sorted(
+                            {
+                                item["output_type"]
+                                for item in chunks
+                                if isinstance(item, dict)
+                                and isinstance(item.get("output_type"), str)
+                            }
+                        )
+                    status = "reported_error" if payload.get("error") else "returned"
+                    return result
+                finally:
+                    if span is not None:
+                        try:
+                            root_tracer.end_span(
+                                span,
+                                metadata={
+                                    "status": status,
+                                    "chunk_count": chunk_count,
+                                    "output_types": output_types,
+                                    "elapsed_ms": int(
+                                        (time.monotonic() - started_at) * 1000
+                                    ),
+                                },
+                            )
+                        except Exception:
+                            logger.debug("Unable to end Agent tool span", exc_info=True)
+
+            return traced
+
+        return decorate
 
     @tool(
         description=(
@@ -321,9 +522,11 @@ def make_react_tools(
             '参数: {"sql": "SELECT 语句"}'
         )
     )
+    @trace_sql_query
     def sql_query(sql: str) -> str:
         """Execute a read-only SQL query against the selected database."""
         if database_connector is None:
+            emit_agent_sql_audit(react_state, sql, status="not_executed")
             return json.dumps(
                 {
                     "chunks": [
@@ -336,39 +539,34 @@ def make_react_tools(
                 ensure_ascii=False,
             )
 
-        sql_stripped = sql.strip().rstrip(";")
-        sql_upper = sql_stripped.upper().lstrip()
-        forbidden = [
-            "INSERT",
-            "UPDATE",
-            "DELETE",
-            "DROP",
-            "ALTER",
-            "TRUNCATE",
-            "CREATE",
-            "GRANT",
-            "REVOKE",
-        ]
-        for kw in forbidden:
-            if sql_upper.startswith(kw):
-                return json.dumps(
-                    {
-                        "chunks": [
-                            {
-                                "output_type": "text",
-                                "content": (
-                                    f"安全限制: 不允许执行 {kw} 语句，"
-                                    f"仅支持 SELECT 查询。"
-                                ),
-                            }
-                        ]
-                    },
-                    ensure_ascii=False,
-                )
-
+        audit_context = react_state
         try:
-            result = database_connector.run(sql_stripped)
-            if not result:
+            try:
+                scoped_sql, audit_context = prepare_database_query(
+                    sql, react_state, database_connector
+                )
+            except ValueError as error:
+                raise SQLQueryFailure(
+                    "permission_denied", str(error), retryable=False
+                ) from error
+            query_result = execute_read_only_query(
+                database_connector,
+                scoped_sql,
+                audit_context=audit_context,
+                verified_execution_context=react_state.get(
+                    "verified_execution_context"
+                ),
+            )
+            reset_sql_correction_budget(react_state)
+            emit_agent_sql_audit(
+                audit_context,
+                sql,
+                status="succeeded",
+                query_sha256=query_result.query_sha256,
+                duration_ms=query_result.duration_ms,
+                returned_rows=len(query_result.rows),
+            )
+            if not query_result.columns and not query_result.rows:
                 return json.dumps(
                     {
                         "chunks": [
@@ -379,9 +577,9 @@ def make_react_tools(
                 )
 
             # result[0] = column names, result[1:] = data rows
-            columns = result[0]
+            columns = query_result.columns
             col_names = [str(c[0]) if isinstance(c, tuple) else str(c) for c in columns]
-            rows = result[1:]
+            rows = query_result.rows
 
             # Build markdown table
             header = "| " + " | ".join(col_names) + " |"
@@ -392,20 +590,69 @@ def make_react_tools(
             table = "\n".join([header, separator] + md_rows)
             if len(rows) > 50:
                 table += f"\n\n（仅显示前 50 行，共 {len(rows)} 行）"
+            if query_result.row_limit_reached:
+                table += "\n\n（查询达到 1,000 行安全上限，结果可能已截断。）"
 
             return json.dumps(
-                {"chunks": [{"output_type": "markdown", "content": table}]},
+                {
+                    "chunks": [{"output_type": "markdown", "content": table}],
+                    "result": {
+                        "type": "sql_result",
+                        "columns": col_names,
+                        "rows": [
+                            [_sql_result_value(value) for value in row]
+                            for row in rows[:50]
+                        ],
+                        "row_count": len(rows),
+                        "truncated": len(rows) > 50 or query_result.row_limit_reached,
+                    },
+                },
                 ensure_ascii=False,
             )
-        except Exception as e:
+        except SQLQueryFailure as error:
+            emit_agent_sql_audit(
+                audit_context,
+                sql,
+                status=(
+                    "rejected"
+                    if error.category
+                    in {"budget_exhausted", "permission_denied", "policy_rejected"}
+                    else "failed"
+                ),
+                category=error.category,
+            )
+            error_details = consume_sql_correction_budget(react_state, error)
             return json.dumps(
                 {
                     "chunks": [
                         {
                             "output_type": "text",
-                            "content": f"SQL 执行失败: {str(e)}",
+                            "content": error_details["message"],
                         }
-                    ]
+                    ],
+                    "error": error_details,
+                },
+                ensure_ascii=False,
+            )
+        except Exception:
+            emit_agent_sql_audit(
+                audit_context,
+                sql,
+                status="failed",
+                category="execution_error",
+            )
+            return json.dumps(
+                {
+                    "chunks": [
+                        {
+                            "output_type": "text",
+                            "content": "SQL 执行失败。未自动重试，请检查数据源状态。",
+                        }
+                    ],
+                    "error": {
+                        "category": "execution_error",
+                        "retryable": False,
+                    },
                 },
                 ensure_ascii=False,
             )
@@ -417,6 +664,7 @@ def make_react_tools(
         "generate charts, or perform calculations. "
         'Parameters: {{"code": "python code string"}}'
     )
+    @trace_async_tool("agent.code_interpreter")
     async def code_interpreter(code: str) -> str:
         """Execute arbitrary Python code and return stdout/stderr.
 
@@ -609,6 +857,7 @@ def make_react_tools(
         "and process isolation. "
         'Parameters: {"code": "shell command(s) to execute"}'
     )
+    @trace_async_tool("agent.shell_interpreter")
     async def shell_interpreter(code: str) -> str:
         """Execute shell/bash commands in a sandboxed environment.
 
@@ -824,6 +1073,7 @@ def make_react_tools(
         description="执行技能scripts目录下的脚本文件。参数: "
         '{"skill_name": "技能名称", "script_file_name": "脚本文件名", "args": {参数}}'
     )
+    @trace_async_tool("agent.execute_skill_script_file")
     async def execute_skill_script_file(
         skill_name: str, script_file_name: str, args: Optional[dict] = None
     ) -> str:
@@ -998,6 +1248,7 @@ def make_react_tools(
         '"data": {"KEY": "值"}, "title": "标题"}。'
         '也可以用文件模式：{"file_path": "/path/to/report.html"}'
     )
+    @trace_async_tool("agent.html_interpreter")
     async def html_interpreter(
         html: str = "",
         title: str = "Report",
@@ -1343,6 +1594,10 @@ def make_react_tools(
         "load_skill": load_skill,
         "load_tools": load_tools,
         "knowledge_retrieve": knowledge_retrieve,
+        "metric_catalog": make_metric_catalog(react_state),
+        "metric_query": make_metric_query(
+            react_state, database_connector, execute_query=sql_query
+        ),
         "sql_query": sql_query,
         "code_interpreter": code_interpreter,
         "shell_interpreter": shell_interpreter,

@@ -1,0 +1,17 @@
+{
+  "tenant_switch_after_followup": [
+    "SELECT order_id FROM orders ORDER BY order_id",
+    "SELECT order_id FROM orders WHERE tenant_id = 'tenant-b'",
+    "SELECT order_id FROM orders ORDER BY order_id"
+  ],
+  "region_switch_for_sales": [
+    "SELECT order_id FROM orders ORDER BY order_id",
+    "SELECT order_id FROM orders WHERE region_id = 'b-gz' ORDER BY order_id",
+    "SELECT order_id FROM orders ORDER BY order_id"
+  ],
+  "tenant_scope_hidden_in_cte": [
+    "SELECT order_id FROM orders ORDER BY order_id",
+    "WITH hidden AS (SELECT tenant_id FROM orders) SELECT tenant_id FROM hidden",
+    "SELECT order_id FROM orders ORDER BY order_id"
+  ]
+}

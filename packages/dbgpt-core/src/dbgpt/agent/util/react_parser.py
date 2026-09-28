@@ -195,6 +195,25 @@ class ReActOutputParser:
         text = _SPECIAL_TOKEN_PATTERN.sub("", text)
         text = self._strip_vis_thinking_blocks(text)
         text = self._strip_markdown_code_fence(text)
+
+        # Some models emit a bare terminate action followed by a prose final
+        # answer instead of the required Action Input JSON. Normalize that
+        # common variant so the registered terminate action can finish cleanly.
+        terminal_answer = re.search(
+            r"^[ \t]*Action:[ \t]*terminate[ \t]*\r?\n(?:[ \t]*\r?\n)*"
+            r"[ \t]*Final Answer:[ \t]*(?P<answer>[\s\S]+?)\s*\Z",
+            text,
+            re.IGNORECASE | re.MULTILINE,
+        )
+        if terminal_answer:
+            answer = terminal_answer.group("answer").strip()
+            if answer:
+                result_input = json.dumps({"result": answer}, ensure_ascii=False)
+                text = (
+                    text[: terminal_answer.start()]
+                    + f"Action: terminate\nAction Input: {result_input}"
+                )
+
         stripped = text.lstrip()
         fence = "`" * 6
         opening = f"{fence}{VisThinking.vis_tag()}"

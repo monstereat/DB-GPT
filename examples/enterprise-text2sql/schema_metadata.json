@@ -1,0 +1,98 @@
+{
+  "source": {
+    "id": "synthetic-ecommerce",
+    "driver": "sqlite",
+    "purpose": "local-demo-and-regression-only",
+    "read_only_queries": true,
+    "tenant_column": "tenant_id",
+    "policy_version": "1.0.0",
+    "region_scope": {
+      "direct": {"regions": "region_id", "users": "region_id", "orders": "region_id"},
+      "via_orders": {"order_items": "order_id", "refunds": "order_id"},
+      "via_order_items": {"products": "product_id"}
+    }
+  },
+  "tables": [
+    {
+      "name": "regions",
+      "description": "销售区域维度表",
+      "columns": [
+        {"name": "tenant_id", "description": "租户隔离键", "classification": "tenant_key", "agent_queryable": false},
+        {"name": "region_id", "description": "区域标识", "classification": "business", "agent_queryable": true},
+        {"name": "name", "description": "区域名称", "classification": "business", "agent_queryable": true},
+        {"name": "area", "description": "大区名称", "classification": "business", "agent_queryable": true}
+      ]
+    },
+    {
+      "name": "users",
+      "description": "买家资料表",
+      "columns": [
+        {"name": "tenant_id", "description": "租户隔离键", "classification": "tenant_key", "agent_queryable": false},
+        {"name": "user_id", "description": "买家标识", "classification": "business", "agent_queryable": true},
+        {"name": "region_id", "description": "买家所属区域", "classification": "business", "agent_queryable": true},
+        {"name": "full_name", "description": "买家姓名", "classification": "personal", "agent_queryable": false},
+        {"name": "email", "description": "买家邮箱", "classification": "personal", "agent_queryable": false},
+        {"name": "phone", "description": "买家电话", "classification": "personal", "agent_queryable": false}
+      ]
+    },
+    {
+      "name": "products",
+      "description": "商品及品类维度表；内部成本不可对 Agent 开放",
+      "columns": [
+        {"name": "tenant_id", "description": "租户隔离键", "classification": "tenant_key", "agent_queryable": false},
+        {"name": "product_id", "description": "商品标识", "classification": "business", "agent_queryable": true},
+        {"name": "product_name", "description": "商品名称", "classification": "business", "agent_queryable": true},
+        {"name": "category", "description": "商品类别", "classification": "business", "agent_queryable": true},
+        {"name": "list_price_cents", "description": "标价，单位为人民币分", "classification": "business", "agent_queryable": true},
+        {"name": "internal_cost_cents", "description": "内部成本，单位为人民币分", "classification": "confidential", "agent_queryable": false}
+      ]
+    },
+    {
+      "name": "orders",
+      "description": "订单主表；total_cents 是订单金额，取消订单不计销售额",
+      "columns": [
+        {"name": "tenant_id", "description": "租户隔离键", "classification": "tenant_key", "agent_queryable": false},
+        {"name": "order_id", "description": "订单标识", "classification": "business", "agent_queryable": true},
+        {"name": "user_id", "description": "买家标识", "classification": "business", "agent_queryable": true},
+        {"name": "region_id", "description": "订单所属区域", "classification": "business", "agent_queryable": true},
+        {"name": "created_at", "description": "下单日期，ISO YYYY-MM-DD", "classification": "business", "agent_queryable": true},
+        {"name": "status", "description": "订单状态", "classification": "business", "agent_queryable": true},
+        {"name": "total_cents", "description": "订单金额，单位为人民币分", "classification": "business", "agent_queryable": true},
+        {"name": "internal_note", "description": "内部备注", "classification": "confidential", "agent_queryable": false}
+      ]
+    },
+    {
+      "name": "order_items",
+      "description": "订单商品明细；商品销售额按 quantity * unit_price_cents 汇总",
+      "columns": [
+        {"name": "tenant_id", "description": "租户隔离键", "classification": "tenant_key", "agent_queryable": false},
+        {"name": "item_id", "description": "明细标识", "classification": "business", "agent_queryable": true},
+        {"name": "order_id", "description": "订单标识", "classification": "business", "agent_queryable": true},
+        {"name": "product_id", "description": "商品标识", "classification": "business", "agent_queryable": true},
+        {"name": "quantity", "description": "购买件数", "classification": "business", "agent_queryable": true},
+        {"name": "unit_price_cents", "description": "成交单价，单位为人民币分", "classification": "business", "agent_queryable": true}
+      ]
+    },
+    {
+      "name": "refunds",
+      "description": "退款记录；amount_cents 是退款金额，按退款发生日期筛选",
+      "columns": [
+        {"name": "tenant_id", "description": "租户隔离键", "classification": "tenant_key", "agent_queryable": false},
+        {"name": "refund_id", "description": "退款标识", "classification": "business", "agent_queryable": true},
+        {"name": "order_id", "description": "原订单标识", "classification": "business", "agent_queryable": true},
+        {"name": "created_at", "description": "退款日期，ISO YYYY-MM-DD", "classification": "business", "agent_queryable": true},
+        {"name": "amount_cents", "description": "退款金额，单位为人民币分", "classification": "business", "agent_queryable": true},
+        {"name": "status", "description": "退款状态", "classification": "business", "agent_queryable": true},
+        {"name": "internal_note", "description": "内部备注", "classification": "confidential", "agent_queryable": false}
+      ]
+    }
+  ],
+  "relations": [
+    {"child_table": "users", "child_columns": ["tenant_id", "region_id"], "parent_table": "regions", "parent_columns": ["tenant_id", "region_id"]},
+    {"child_table": "orders", "child_columns": ["tenant_id", "user_id"], "parent_table": "users", "parent_columns": ["tenant_id", "user_id"]},
+    {"child_table": "orders", "child_columns": ["tenant_id", "region_id"], "parent_table": "regions", "parent_columns": ["tenant_id", "region_id"]},
+    {"child_table": "order_items", "child_columns": ["tenant_id", "order_id"], "parent_table": "orders", "parent_columns": ["tenant_id", "order_id"]},
+    {"child_table": "order_items", "child_columns": ["tenant_id", "product_id"], "parent_table": "products", "parent_columns": ["tenant_id", "product_id"]},
+    {"child_table": "refunds", "child_columns": ["tenant_id", "order_id"], "parent_table": "orders", "parent_columns": ["tenant_id", "order_id"]}
+  ]
+}

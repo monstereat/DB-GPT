@@ -1,19 +1,25 @@
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 
 import pytest
 from fastapi import HTTPException
 
 from dbgpt.component import SystemApp
+from dbgpt_ext.rag.chunk_manager import ChunkParameters
 from dbgpt_serve.core.tests.conftest import (  # noqa: F401
     asystem_app,
     client,
     config,
     system_app,
 )
+from dbgpt_serve.rag.api.endpoints import space_retrieve
+from dbgpt_serve.rag.retriever import knowledge_space
 
 from ..api.schemas import (
     DocumentServeRequest,
     DocumentServeResponse,
+    KnowledgeRetrieveRequest,
+    KnowledgeSyncRequest,
     SpaceServeResponse,
 )
 from ..models.chunk_db import DocumentChunkDao
@@ -66,6 +72,153 @@ async def test_create_space(service):
 
     assert response["name"] == "TestSpace"
     service._dao.create_knowledge_space.assert_called_once_with(request)
+
+
+@pytest.mark.parametrize(
+    "setting_name",
+    ["DBGPT_DAILY_TOKEN_LIMIT", "DBGPT_REACT_DAILY_TOKEN_LIMIT"],
+)
+@pytest.mark.asyncio
+async def test_knowledge_graph_sync_fails_closed_before_dispatch(
+    service, monkeypatch, setting_name
+):
+    monkeypatch.setenv("DBGPT_DAILY_TOKEN_LIMIT", "")
+    monkeypatch.setenv("DBGPT_REACT_DAILY_TOKEN_LIMIT", "")
+    monkeypatch.setenv(setting_name, "1000")
+    doc = SimpleNamespace(id=1, doc_name="test", space="graph-space", status="TODO")
+    service._document_dao.documents_by_ids = Mock(return_value=[doc])
+    service.get = Mock(
+        return_value=SimpleNamespace(vector_type="KnowledgeGraph", context=None)
+    )
+    service._sync_knowledge_document = AsyncMock()
+
+    with pytest.raises(HTTPException) as exc_info:
+        await service.sync_document(
+            [
+                KnowledgeSyncRequest(
+                    doc_id=1,
+                    space_id="1",
+                    chunk_parameters=ChunkParameters(chunk_strategy="CHUNK_BY_SIZE"),
+                )
+            ]
+        )
+
+    assert exc_info.value.status_code == 503
+    service._sync_knowledge_document.assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    "setting_name",
+    ["DBGPT_DAILY_TOKEN_LIMIT", "DBGPT_REACT_DAILY_TOKEN_LIMIT"],
+)
+@pytest.mark.asyncio
+async def test_vector_store_sync_remains_available_with_daily_quota(
+    service, monkeypatch, setting_name
+):
+    monkeypatch.setenv("DBGPT_DAILY_TOKEN_LIMIT", "")
+    monkeypatch.setenv("DBGPT_REACT_DAILY_TOKEN_LIMIT", "")
+    monkeypatch.setenv(setting_name, "1000")
+    doc = SimpleNamespace(id=1, doc_name="test", space="vector-space", status="TODO")
+    service._document_dao.documents_by_ids = Mock(return_value=[doc])
+    service.get = Mock(return_value=SimpleNamespace(vector_type="VectorStore"))
+    service._sync_knowledge_document = AsyncMock()
+
+    result = await service.sync_document(
+        [
+            KnowledgeSyncRequest(
+                doc_id=1,
+                space_id="1",
+                chunk_parameters=ChunkParameters(chunk_strategy="CHUNK_BY_SIZE"),
+            )
+        ]
+    )
+
+    assert result == [1]
+    service._sync_knowledge_document.assert_awaited_once()
+
+
+@pytest.mark.parametrize(
+    "setting_name",
+    ["DBGPT_DAILY_TOKEN_LIMIT", "DBGPT_REACT_DAILY_TOKEN_LIMIT"],
+)
+@pytest.mark.asyncio
+async def test_llm_backed_retrieval_fails_closed_when_quota_enabled(
+    monkeypatch, setting_name
+):
+    monkeypatch.setenv("DBGPT_DAILY_TOKEN_LIMIT", "")
+    monkeypatch.setenv("DBGPT_REACT_DAILY_TOKEN_LIMIT", "")
+    monkeypatch.setenv(setting_name, "1000")
+    space = SimpleNamespace(
+        vector_type="VectorStore",
+        context='{"embedding":{"retrieve_mode":"Tree"}}',
+    )
+
+    class FakeService:
+        called = False
+
+        def get(self, request):
+            return space
+
+        async def retrieve(self, request, resolved_space):
+            self.called = True
+            return []
+
+    service = FakeService()
+    with pytest.raises(HTTPException) as exc_info:
+        await space_retrieve(
+            1, KnowledgeRetrieveRequest(space_id=1, query="test"), service
+        )
+
+    assert exc_info.value.status_code == 503
+    assert service.called is False
+
+
+@pytest.mark.asyncio
+async def test_semantic_retrieval_remains_available_when_quota_enabled(monkeypatch):
+    monkeypatch.setenv("DBGPT_DAILY_TOKEN_LIMIT", "1000")
+    monkeypatch.setenv("DBGPT_REACT_DAILY_TOKEN_LIMIT", "")
+    space = SimpleNamespace(vector_type="VectorStore", context=None)
+
+    class FakeService:
+        called = False
+
+        def get(self, request):
+            return space
+
+        async def retrieve(self, request, resolved_space):
+            self.called = True
+            return []
+
+    service = FakeService()
+    await space_retrieve(1, KnowledgeRetrieveRequest(space_id=1, query="test"), service)
+
+    assert service.called is True
+
+
+def test_knowledge_retriever_requires_metered_client_when_quota_enabled(
+    monkeypatch,
+):
+    monkeypatch.setenv("DBGPT_DAILY_TOKEN_LIMIT", "1000")
+    monkeypatch.setenv("DBGPT_REACT_DAILY_TOKEN_LIMIT", "")
+    raw_client = object()
+    wrapped_client = object()
+    mock_system = Mock()
+    mock_system.get_component.return_value.create.return_value = object()
+    monkeypatch.setattr(
+        knowledge_space, "DefaultLLMClient", lambda *_args, **_kwargs: raw_client
+    )
+    retriever = object.__new__(knowledge_space.KnowledgeSpaceRetriever)
+    retriever._system_app = mock_system
+
+    with pytest.raises(RuntimeError, match="metered knowledge retrieval"):
+        _ = retriever.llm_client
+
+    from dbgpt.core.interface.operators.llm_operator import (
+        scoped_llm_client_wrapper,
+    )
+
+    with scoped_llm_client_wrapper(lambda _client: wrapped_client):
+        assert retriever.llm_client is wrapped_client
 
 
 def test_create_space_already_exists(service):

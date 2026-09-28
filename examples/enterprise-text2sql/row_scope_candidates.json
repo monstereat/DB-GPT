@@ -1,0 +1,13 @@
+{
+  "tenant_scope": "SELECT order_id FROM orders ORDER BY order_id",
+  "sales_direct_region": "SELECT order_id FROM orders ORDER BY order_id",
+  "sales_refunds_via_orders": "SELECT refund_id FROM refunds ORDER BY refund_id",
+  "sales_items_via_orders": "SELECT item_id FROM order_items ORDER BY item_id",
+  "sales_products_via_items": "SELECT product_id FROM products ORDER BY product_id",
+  "tenant_or_bypass": "SELECT order_id FROM orders WHERE tenant_id = 'tenant-b' OR 1 = 1",
+  "region_or_bypass": "SELECT order_id FROM orders WHERE region_id = 'a-sz' OR 1 = 1",
+  "missing_tenant": "SELECT order_id FROM orders",
+  "missing_sales_region": "SELECT order_id FROM orders",
+  "unregistered_table": "SELECT value FROM private_table",
+  "unregistered_schema": "SELECT order_id FROM other_schema.orders"
+}

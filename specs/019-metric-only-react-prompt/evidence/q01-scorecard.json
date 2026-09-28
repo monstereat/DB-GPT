@@ -1,0 +1,30 @@
+{
+  "question_count": 1,
+  "correct": 1,
+  "incorrect": 0,
+  "missing_result": 0,
+  "invalid_result": 0,
+  "truncated": 0,
+  "result_accuracy": 1.0,
+  "by_category": {
+    "regional_sales": {
+      "question_count": 1,
+      "correct": 1,
+      "incorrect": 0,
+      "missing_result": 0,
+      "invalid_result": 0,
+      "truncated": 0,
+      "accuracy": 1.0
+    }
+  },
+  "macro_average_accuracy": 1.0,
+  "cases": [
+    {
+      "question_id": "q01",
+      "category": "regional_sales",
+      "status": "correct",
+      "result_sha256": "f564add364b76b8df93961039fb8158261bf1e0061c93b9599d8fc9c6f0e556f"
+    }
+  ],
+  "note": "Live local DB-GPT qwen3:1.7b evaluation. Structured result exactly matches the synthetic gold columns and rows."
+}

@@ -2,7 +2,7 @@
 
 from typing import List, Optional
 
-from dbgpt._private.llm_metadata import LLMMetadata
+from dbgpt._private.llm_metadata import DEFAULT_NUM_OUTPUTS, LLMMetadata
 from dbgpt.core import Chunk, LLMClient, ModelMessageRoleType, ModelRequest
 from dbgpt.rag.extractor.base import Extractor
 from dbgpt.util import utils
@@ -164,7 +164,16 @@ class SummaryExtractor(Extractor):
 
             prompt = prompt_template.format(context=chunk_text)
             messages = [ModelMessage(role=ModelMessageRoleType.HUMAN, content=prompt)]
-            request = ModelRequest(model=self._model_name, messages=messages)
+            max_new_tokens = (
+                self.llm_metadata.num_output
+                if self.llm_metadata is not None
+                else DEFAULT_NUM_OUTPUTS
+            )
+            request = ModelRequest(
+                model=self._model_name,
+                messages=messages,
+                max_new_tokens=max_new_tokens,
+            )
             tasks.append(self._llm_client.generate(request))  # type ignore
         summary_results = await run_async_tasks(
             tasks=tasks, concurrency_limit=self._concurrency_limit_with_llm

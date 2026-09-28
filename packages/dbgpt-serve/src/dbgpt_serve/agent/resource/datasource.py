@@ -1,6 +1,6 @@
 import dataclasses
 import logging
-from typing import Any, List, Optional, Type, Union, cast
+from typing import Any, Callable, Dict, List, Optional, Type, Union, cast
 
 from dbgpt._private.config import Config
 from dbgpt.agent.resource.database import (
@@ -123,9 +123,38 @@ class DatasourceDBParameters(DBParameters):
     ],
 )
 class DatasourceResource(RDBMSConnectorResource):
-    def __init__(self, name: str, db_name: Optional[str] = None, **kwargs):
+    requires_trusted_execution_context = True
+
+    def __init__(
+        self,
+        name: str,
+        db_name: Optional[str] = None,
+        trusted_execution_context: Optional[Dict[str, Any]] = None,
+        access_checker: Optional[Callable] = None,
+        query_policy: Optional[Callable] = None,
+        **kwargs,
+    ):
+        if (
+            not trusted_execution_context
+            or trusted_execution_context.get("source") != "verified_oidc_jwt"
+            or not callable(access_checker)
+            or not callable(query_policy)
+        ):
+            raise PermissionError("Verified identity is required for datasource access")
+        access_checker(db_name, trusted_execution_context)
+        request_identity = {
+            **trusted_execution_context,
+            "data_source_id": db_name,
+        }
         conn = CFG.local_db_manager.get_connector(db_name)
-        super().__init__(name, connector=conn, db_name=db_name, **kwargs)
+        super().__init__(
+            name,
+            connector=conn,
+            db_name=db_name,
+            trusted_execution_context=request_identity,
+            query_policy=query_policy,
+            **kwargs,
+        )
 
     @classmethod
     def resource_parameters_class(cls, **kwargs) -> Type[DatasourceDBParameters]:

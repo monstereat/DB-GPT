@@ -5,13 +5,16 @@ from typing import Any, Dict
 
 from dbgpt.agent.resource.tool.base import tool
 
+from .tool_tracing import trace_agent_tool
+
 
 def make_load_tools(react_state: Dict[str, Any]):
     @tool(description="Resolve required tools for the selected skill.")
+    @trace_agent_tool("agent.load_tools")
     def load_tools() -> str:
         from dbgpt._private.config import Config
+        from dbgpt.agent.resource.base import AgentResource, ResourceType
         from dbgpt.agent.resource.manage import get_resource_manager
-        from dbgpt.agent.resource.resource_api import AgentResource, ResourceType
 
         CFG = Config()
         matched = react_state.get("matched")

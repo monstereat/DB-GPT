@@ -1,10 +1,11 @@
 import json
+import os
 import re
 import time
 import uuid
 from typing import AsyncIterator, Optional
 
-from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, Header, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from starlette.responses import JSONResponse, StreamingResponse
 
@@ -34,14 +35,38 @@ from dbgpt_app.scene import BaseChat, ChatParam, ChatScene
 from dbgpt_client.schema import ChatCompletionRequestBody, ChatMode
 from dbgpt_serve.agent.agents.controller import multi_agents
 from dbgpt_serve.flow.api.endpoints import get_service
+from dbgpt_serve.utils.auth import (
+    UserRequest,
+    get_user_from_headers,
+    trusted_agent_execution_context,
+)
 
 router = APIRouter()
 api_settings = APISettings()
 get_bearer_token = HTTPBearer(auto_error=False)
 
 
+def _v2_quota_user(
+    authorization: Optional[str] = Header(None),
+    user_id: Optional[str] = Header(None),
+) -> Optional[UserRequest]:
+    """Resolve OIDC only when a daily quota is enabled, preserving API-key mode."""
+    if not os.getenv("DBGPT_DAILY_TOKEN_LIMIT", "").strip():
+        return None
+    scheme, separator, token = (authorization or "").partition(" ")
+    if not separator or scheme.lower() != "bearer" or not token.strip():
+        raise HTTPException(status_code=401, detail="Bearer token required")
+    return get_user_from_headers(
+        user_id=user_id,
+        credentials=HTTPAuthorizationCredentials(
+            scheme=scheme, credentials=token.strip()
+        ),
+    )
+
+
 async def check_api_key(
     auth: Optional[HTTPAuthorizationCredentials] = Depends(get_bearer_token),
+    x_api_key: Optional[str] = Header(None),
     service=Depends(get_service),
 ) -> Optional[str]:
     """Check the api key
@@ -51,7 +76,8 @@ async def check_api_key(
     """
     if service.config.api_keys:
         api_keys = [key.strip() for key in service.config.api_keys.split(",")]
-        if auth is None or (token := auth.credentials) not in api_keys:
+        token = x_api_key or (auth.credentials if auth is not None else None)
+        if token not in api_keys:
             raise HTTPException(
                 status_code=401,
                 detail={
@@ -72,6 +98,7 @@ async def check_api_key(
 async def chat_completions(
     request: ChatCompletionRequestBody = Body(),
     service=Depends(get_service),
+    user_token: Optional[UserRequest] = Depends(_v2_quota_user),
 ):
     """Chat V2 completions
     Args:
@@ -91,6 +118,30 @@ async def chat_completions(
     }
     # check chat request
     check_chat_request(request)
+    configured_quota = os.getenv("DBGPT_DAILY_TOKEN_LIMIT")
+    token_quota_context = None
+    if configured_quota and configured_quota.strip():
+        supported_modes = {
+            None,
+            ChatMode.CHAT_NORMAL.value,
+            ChatMode.CHAT_KNOWLEDGE.value,
+            ChatMode.CHAT_DATA.value,
+            ChatMode.CHAT_DB_QA.value,
+            ChatMode.CHAT_DASHBOARD.value,
+            ChatMode.CHAT_APP.value,
+        }
+        if request.chat_mode not in supported_modes:
+            raise HTTPException(
+                status_code=503,
+                detail="Daily token quota is not available for this chat mode",
+            )
+        from dbgpt_app.openapi.api_v1.token_quota import (
+            resolve_daily_token_quota_context,
+        )
+
+        token_quota_context = resolve_daily_token_quota_context(
+            user_token, configured_quota, "DBGPT_DAILY_TOKEN_LIMIT"
+        )
     if request.conv_uid is None:
         request.conv_uid = str(uuid.uuid4())
     if request.chat_mode == ChatMode.CHAT_APP.value:
@@ -106,9 +157,14 @@ async def chat_completions(
                     }
                 },
             )
+        if token_quota_context and multi_agents.is_flow_chat(request.chat_param):
+            raise HTTPException(
+                status_code=503,
+                detail="Daily token quota is not available for this flow type",
+            )
         return StreamingResponse(
             chat_app_stream_wrapper(
-                request=request,
+                request=request, token_quota_context=token_quota_context
             ),
             headers=headers,
             media_type="text/event-stream",
@@ -135,7 +191,12 @@ async def chat_completions(
             span_type=SpanType.CHAT,
             metadata=model_to_dict(request),
         ):
-            chat: BaseChat = await get_chat_instance(request, service.system_app)
+            chat: BaseChat = await get_chat_instance(
+                request,
+                service.system_app,
+                user_token=user_token,
+                token_quota_context=token_quota_context,
+            )
 
         if not request.stream:
             # TODO: Adapt to the new chat interface
@@ -168,7 +229,10 @@ async def chat_completions(
 
 
 async def get_chat_instance(
-    dialogue: ChatCompletionRequestBody = Body(), system_app: SystemApp = None
+    dialogue: ChatCompletionRequestBody = Body(),
+    system_app: SystemApp = None,
+    user_token: Optional[UserRequest] = None,
+    token_quota_context: Optional[dict] = None,
 ) -> BaseChat:
     """
     Get chat instance
@@ -189,9 +253,10 @@ async def get_chat_instance(
     if not ChatScene.is_valid_mode(dialogue.chat_mode):
         raise StopAsyncIteration(f"Unsupported Chat Mode,{dialogue.chat_mode}!")
 
+    identity = trusted_agent_execution_context(user_token) if user_token else None
     chat_param = ChatParam(
         chat_session_id=dialogue.conv_uid,
-        user_name=dialogue.user_name,
+        user_name=(identity["actor_id"] if identity else dialogue.user_name),
         sys_code=dialogue.sys_code,
         current_user_input=dialogue.single_prompt(),
         select_param=dialogue.chat_param,
@@ -199,6 +264,11 @@ async def get_chat_instance(
         temperature=dialogue.temperature,
         max_new_tokens=dialogue.max_new_tokens,
         chat_mode=ChatScene.of_mode(dialogue.chat_mode),
+        token_quota_context=token_quota_context,
+        user_role=user_token.role if identity else None,
+        tenant_id=user_token.tenant_id if identity else None,
+        region_id=user_token.region_id if identity else None,
+        verified_execution_context=identity,
     )
     chat: BaseChat = await blocking_func_to_async(
         get_executor(),
@@ -232,18 +302,26 @@ async def no_stream_wrapper(
         )
 
 
-async def chat_app_stream_wrapper(request: ChatCompletionRequestBody = None):
+async def chat_app_stream_wrapper(
+    request: ChatCompletionRequestBody = None,
+    token_quota_context: Optional[dict] = None,
+):
     """chat app stream
     Args:
         request (OpenAPIChatCompletionRequest): request
         token (APIToken): token
     """
+    from dbgpt_app.openapi.api_v1.token_quota import (
+        build_metered_llm_client_wrapper,
+    )
+
     async for output in multi_agents.app_agent_chat(
         conv_uid=request.conv_uid,
         gpts_name=request.chat_param,
         user_query=request.single_prompt(),
         user_code=request.user_name,
         sys_code=request.sys_code,
+        llm_client_wrapper=build_metered_llm_client_wrapper(token_quota_context),
     ):
         match = re.search(r"data:\s*({.*})", output)
         if match:

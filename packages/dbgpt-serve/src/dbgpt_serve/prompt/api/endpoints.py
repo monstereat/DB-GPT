@@ -1,14 +1,19 @@
 import logging
+import os
 from functools import cache
+from hmac import compare_digest
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from fastapi.security.http import HTTPAuthorizationCredentials, HTTPBearer
 from starlette.responses import StreamingResponse
 
 from dbgpt.component import SystemApp
 from dbgpt.util import PaginationResult
 from dbgpt_serve.core import Result
+from dbgpt_serve.utils.auth import UserRequest, get_user_from_headers
+from dbgpt_serve.utils.token_quota import daily_token_quota_enabled
+from dbgpt_serve.utils.token_quota_client import resolve_daily_token_quota_context
 
 from ..config import SERVE_SERVICE_COMPONENT_NAME, ServeConfig
 from ..service.service import Service
@@ -54,7 +59,7 @@ def _parse_api_keys(api_keys: str) -> List[str]:
 
 async def check_api_key(
     auth: Optional[HTTPAuthorizationCredentials] = Depends(get_bearer_token),
-    request: Request = None,
+    x_api_key: Optional[str] = Header(None),
     service: Service = Depends(get_service),
 ) -> Optional[str]:
     """Check the api key
@@ -73,8 +78,29 @@ async def check_api_key(
         assert res.status_code == 200
 
     """
-    if request.url.path.startswith("/api/v1"):
-        return None
+    if service.config.api_keys:
+        api_keys = _parse_api_keys(service.config.api_keys)
+        candidates = [
+            key for key in (x_api_key, auth.credentials if auth else None) if key
+        ]
+        if not any(
+            compare_digest(candidate, configured)
+            for candidate in candidates
+            for configured in api_keys
+        ):
+            raise HTTPException(
+                status_code=401,
+                detail={
+                    "error": {
+                        "message": "",
+                        "type": "invalid_request_error",
+                        "param": None,
+                        "code": "invalid_api_key",
+                    }
+                },
+            )
+        return x_api_key or auth.credentials
+    return None
 
 
 @router.get("/health")
@@ -244,6 +270,7 @@ async def load_template(
 async def template_debug(
     debug_input: PromptDebugInput,
     service: Service = Depends(get_service),
+    user_info: UserRequest = Depends(get_user_from_headers),
 ):
     """test Prompt
 
@@ -253,6 +280,16 @@ async def template_debug(
     Returns:
         ServerResponse: The response
     """
+    token_quota_context = None
+    if daily_token_quota_enabled():
+        setting_name = "DBGPT_DAILY_TOKEN_LIMIT"
+        configured_limit = os.getenv(setting_name)
+        if not configured_limit or not configured_limit.strip():
+            setting_name = "DBGPT_REACT_DAILY_TOKEN_LIMIT"
+            configured_limit = os.getenv(setting_name)
+        token_quota_context = resolve_daily_token_quota_context(
+            user_info, configured_limit, setting_name
+        )
     headers = {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
@@ -263,6 +300,7 @@ async def template_debug(
         return StreamingResponse(
             service.debug_prompt(
                 debug_input=debug_input,
+                token_quota_context=token_quota_context,
             ),
             headers=headers,
             media_type="text/event-stream",

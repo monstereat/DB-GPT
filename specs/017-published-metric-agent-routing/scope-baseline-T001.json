@@ -1,0 +1,1238 @@
+{
+  "schema_version": 2,
+  "base_commit": "93da908aa2ba936909a70d7b083ab6455f8a0a85",
+  "initial_snapshots": {
+    ".github/workflows/develop-me-sql-guard.yml": {
+      "kind": "file",
+      "sha256": "02b674ab289705801e1131e7367629e0b5a58e65511a2a9f917ce82d82d3cf15"
+    },
+    ".gitignore": {
+      "kind": "file",
+      "sha256": "a89fa081d3edcccc145e4611a0e3223a0d5bd8672f9f2d32d87e0a456fd345ba"
+    },
+    ".workbuddy/memory/2026-09-24.md": {
+      "kind": "file",
+      "sha256": "1ff31e095c347eddd25032ce2113b72181bea973cca19c2d19279612cd88ed8d"
+    },
+    "assets/schema/dbgpt.sql": {
+      "kind": "file",
+      "sha256": "06062e7caa9a34436140a770b19464a307fdfdb6a9811c9b2c8d88e15331d3fd"
+    },
+    "assets/schema/upgrade/v0_8_2/upgrade_to_v0.8.2.sql": {
+      "kind": "file",
+      "sha256": "2deeb73ae5448899950ec9fb92d28329e45da32db057514ab56d45884333eb24"
+    },
+    "assets/schema/upgrade/v0_8_2/v0.8.2.sql": {
+      "kind": "file",
+      "sha256": "177c7f3fe4690b1a995c7c229a9d2dc75456e5eda8e3f2d8b2abcd30020eab5e"
+    },
+    "docker/base/Dockerfile": {
+      "kind": "file",
+      "sha256": "7c84c967d0a7f7c51d6f9e7e68ea91372d37f9ad8264ef8e6e4ae381e62a441f"
+    },
+    "docker/base/Dockerfile.test": {
+      "kind": "file",
+      "sha256": "f1e7a28cd68944bbd44b65dc0a6d5af9b8f423bddae391b535e9be0a185d304a"
+    },
+    "docker/compose_examples/develop-me-test/README.md": {
+      "kind": "file",
+      "sha256": "439b6f62428e5b5acea5dbb98b2ffdbfae84c0579ae3cf8b41905ad3e93e36b8"
+    },
+    "docker/compose_examples/develop-me-test/compose.yaml": {
+      "kind": "file",
+      "sha256": "589c43100ab4736d6cbc93bedf1c968ee0edf5c5fbbc33d6e0a6c67c56395ee7"
+    },
+    "docker/compose_examples/develop-me-test/config/dbgpt-test-ollama.toml": {
+      "kind": "file",
+      "sha256": "463e0d60675cc09ba02d778b1206f860f2b92a45d88dd2b71d734363ee2aa144"
+    },
+    "docs/develop-me-roadmap.md": {
+      "kind": "file",
+      "sha256": "2ab517ba9ecbc55cfde8a5be20353b7b67c4170ca549273d78d9f3e1b198ece8"
+    },
+    "examples/enterprise-text2sql/README.md": {
+      "kind": "file",
+      "sha256": "f8d091eae84464813dd4ad81cd63299a744554227c13c1cb7c3c12f9a72ae372"
+    },
+    "examples/enterprise-text2sql/agent_multiturn_questions.json": {
+      "kind": "file",
+      "sha256": "753cc633b5288b8ed6d2946dddae716d406005cd4e0477b7867a2eb0d4f5c6f8"
+    },
+    "examples/enterprise-text2sql/agent_policy_cases.json": {
+      "kind": "file",
+      "sha256": "6096c9ee6a7998d6be12385d02c88325a5e4fc1123d73f41501a5771970e5ff0"
+    },
+    "examples/enterprise-text2sql/ambiguity_candidates.json": {
+      "kind": "file",
+      "sha256": "db5a45d692f8384c2146c9bbf21d73f33a0084516455597dfef73330c2d1e56c"
+    },
+    "examples/enterprise-text2sql/ambiguity_cases.json": {
+      "kind": "file",
+      "sha256": "7014ce77a75573fa9ab4752f5b1a3d3f351cea5f7bb7b25bbab9c77430b62080"
+    },
+    "examples/enterprise-text2sql/api.py": {
+      "kind": "file",
+      "sha256": "e38d76b00e529e0f4aab55da795e394bdf5553a3aa18f5ab28534b319b7f53a7"
+    },
+    "examples/enterprise-text2sql/business_dictionary.md": {
+      "kind": "file",
+      "sha256": "60d4582e815436716736c61d6603186da4f7f30615e8c74f18528a97746b65d0"
+    },
+    "examples/enterprise-text2sql/dialect_security_candidates.json": {
+      "kind": "file",
+      "sha256": "42e566dcd0b559162fbbf2d7cf3781a74f402b3c7fb42dab70321687b89c261e"
+    },
+    "examples/enterprise-text2sql/ecommerce_demo.py": {
+      "kind": "file",
+      "sha256": "f7b4dd4dea49553178767c332273fe96bde452026daa6edeb4268880a1162520"
+    },
+    "examples/enterprise-text2sql/evaluate_agent.py": {
+      "kind": "file",
+      "sha256": "fc1bf40a706f451b68747d8f6bf161b53e9ea5b259a95d65494b38b0cae69969"
+    },
+    "examples/enterprise-text2sql/evaluate_candidates.py": {
+      "kind": "file",
+      "sha256": "7a6b9d27f26328601c7d3b36bf8dc0e1306c8f2f6af91d867cd0389309dca070"
+    },
+    "examples/enterprise-text2sql/gold_candidates.json": {
+      "kind": "file",
+      "sha256": "a67c934170f7ca5232ea3a041abd470aeb699667ae2e2db2292b4db66ea2572e"
+    },
+    "examples/enterprise-text2sql/gold_questions.json": {
+      "kind": "file",
+      "sha256": "a5c4e60d48f1036f0a2aa647cc61796e74ae9fe46061d99b702ff039a7b5bd11"
+    },
+    "examples/enterprise-text2sql/guarded_query.py": {
+      "kind": "file",
+      "sha256": "563353a1e5b53f26ccb5d3f248eb457b50603ff9891f8110afcb1d76c939a9a5"
+    },
+    "examples/enterprise-text2sql/metric_cache.py": {
+      "kind": "file",
+      "sha256": "52be8419909f65e71c510a9679cb2c4dc265c25e43621fa53d8e7ba8f721e42b"
+    },
+    "examples/enterprise-text2sql/metric_candidates.json": {
+      "kind": "file",
+      "sha256": "ce70628accb7b0672d860e963d2a190fbdd65cf36847d5ab0b2a23aeccad5646"
+    },
+    "examples/enterprise-text2sql/metric_catalog.json": {
+      "kind": "file",
+      "sha256": "fb8f6d403f1ed876fcd96c0e577cca3fad285a7d1c9c87e526a8f52880d3186c"
+    },
+    "examples/enterprise-text2sql/metric_governance.py": {
+      "kind": "file",
+      "sha256": "75a111c20ed6681e8fc3ea4c425e97d71fa7844d7980bf7a85910b704e35104e"
+    },
+    "examples/enterprise-text2sql/migrate_report_results.py": {
+      "kind": "file",
+      "sha256": "82375b2c88b93b204b9bd48842b04a9ba54668acedd46244ca00688343e048b9"
+    },
+    "examples/enterprise-text2sql/multiturn_authorization_candidates.json": {
+      "kind": "file",
+      "sha256": "d25d1bc6040db03b4003ece52b06a65b7a92ce4397b2069b305ea9cf1c355f9f"
+    },
+    "examples/enterprise-text2sql/multiturn_authorization_cases.json": {
+      "kind": "file",
+      "sha256": "55ce5eafa9ed20ce11cdcc7eb62dafc5cce27856be24da0f55ee2b5c1c94112e"
+    },
+    "examples/enterprise-text2sql/prune_report_tasks.py": {
+      "kind": "file",
+      "sha256": "73a3ddc313d8cf9dbbc4c9af646effc0ae280ad650e10052a80ac5846e998f51"
+    },
+    "examples/enterprise-text2sql/report_tasks.py": {
+      "kind": "file",
+      "sha256": "18240aaf2d959dd2df494a18edb192571b56eb51580f623675abcfc825318606"
+    },
+    "examples/enterprise-text2sql/report_template_governance.py": {
+      "kind": "file",
+      "sha256": "8fd007ab0f68c6a974642bfd24405e61ef8533eb088436067387a27be6b1db65"
+    },
+    "examples/enterprise-text2sql/report_templates.json": {
+      "kind": "file",
+      "sha256": "10eef19a2410450e2a49d924d323c5049ef49f7af42eb6aa1cb473a745c0faca"
+    },
+    "examples/enterprise-text2sql/requirements-test.txt": {
+      "kind": "file",
+      "sha256": "06523e1ae49ca20905ef7c1b10367a0ae724d22532393631459b5aa0a64d53df"
+    },
+    "examples/enterprise-text2sql/row_scope_candidates.json": {
+      "kind": "file",
+      "sha256": "c86075c54c7de6e3717a968b29e50d335637b63cb2f42f38d0aa649a279b1bd8"
+    },
+    "examples/enterprise-text2sql/schema_metadata.json": {
+      "kind": "file",
+      "sha256": "323aa9bedb1a807d05ece2d240c1bdfeefb3c61bdc48c606ded033d5f65251f6"
+    },
+    "examples/enterprise-text2sql/schema_security_candidates.json": {
+      "kind": "file",
+      "sha256": "745b3202647df3e780c4f09440f9e2984365a16ce1c21e7f72950d6bb785482b"
+    },
+    "examples/enterprise-text2sql/security_candidates.json": {
+      "kind": "file",
+      "sha256": "a13ac05c02667bf930b24f771e54fb46c0d907439b2969aa7cc92d30a1ccc10a"
+    },
+    "examples/enterprise-text2sql/semantic_metrics.py": {
+      "kind": "file",
+      "sha256": "18504d805eec8b0ceb2c37ee54e1aae09a286dc696d1538d1403fd4c55f9af2a"
+    },
+    "examples/enterprise-text2sql/test_api.py": {
+      "kind": "file",
+      "sha256": "50e64bda3a921806aeba63ed62a54cd3c5b20926b369182db7cca65ecb871a3c"
+    },
+    "examples/enterprise-text2sql/test_ecommerce_demo.py": {
+      "kind": "file",
+      "sha256": "af2eeea07b705ecbbbfab769de9bab375283bf0beca123b9b857b4dbb379ae8e"
+    },
+    "examples/enterprise-text2sql/test_evaluate_agent.py": {
+      "kind": "file",
+      "sha256": "173b684a519ef41472990a41865c21e5f4fc79497858ce77418f89c72e3e71b3"
+    },
+    "examples/enterprise-text2sql/test_evaluate_candidates.py": {
+      "kind": "file",
+      "sha256": "f33e7412b2ac5442c52631e16ebd8d931d3bccadffce0385739413f2007a90ac"
+    },
+    "examples/enterprise-text2sql/test_guarded_query.py": {
+      "kind": "file",
+      "sha256": "f9885218f1329179d3bca53d410ed6a4d9153e77fbba311f9be8ce8bb427c049"
+    },
+    "examples/enterprise-text2sql/test_metric_cache.py": {
+      "kind": "file",
+      "sha256": "9cbba820ce862c0348aa09d352252125b40166d8d9362c17049d4162466e93cd"
+    },
+    "examples/enterprise-text2sql/test_metric_governance.py": {
+      "kind": "file",
+      "sha256": "659934d708e8b324e825aea04f46975e1d3b9fe6bdabb4fe09beec37d57d37d3"
+    },
+    "examples/enterprise-text2sql/test_report_tasks.py": {
+      "kind": "file",
+      "sha256": "177cb34e4e2598aa655bfdd9f6b97311fdb989446c7c67d3e66dd7681e84309d"
+    },
+    "examples/enterprise-text2sql/test_report_template_governance.py": {
+      "kind": "file",
+      "sha256": "ef15a73d0ee75b4a2549482e90f56a2ce8b32bd50f55449c2c2fd1af8076d5a2"
+    },
+    "examples/enterprise-text2sql/test_semantic_metrics.py": {
+      "kind": "file",
+      "sha256": "a40d7d0ee846c77fbe7a6e491f9bf9544f918a5886aee027d8eb4be84da2bf58"
+    },
+    "examples/enterprise-text2sql/ui/README.md": {
+      "kind": "file",
+      "sha256": "e610c59c573468d87cf52ca89463dd84f42354d70f2d2bcdb381abc425b8122a"
+    },
+    "examples/enterprise-text2sql/ui/index.html": {
+      "kind": "file",
+      "sha256": "320d42a69b9eb053aebca478cfa5e8329f3290092421c3e3c0813cec58fbc7e3"
+    },
+    "examples/enterprise-text2sql/ui/package-lock.json": {
+      "kind": "file",
+      "sha256": "9b7c9f165f545d2050497d9d9ca50a18ed9068ead388ada344e593a299d3d87d"
+    },
+    "examples/enterprise-text2sql/ui/package.json": {
+      "kind": "file",
+      "sha256": "64bd365863bd97c8d5f247782aba107b83b040990e442c46e4a5a615a24093d1"
+    },
+    "examples/enterprise-text2sql/ui/src/App.vue": {
+      "kind": "file",
+      "sha256": "69a2d63378aeb8f859f367c50833a4642141deca749cee6b5c7687319d2cd254"
+    },
+    "examples/enterprise-text2sql/ui/src/agent-conversation.js": {
+      "kind": "file",
+      "sha256": "39b275fcbd221826a37cff082d349d723462accf85e6b06f277f8bc255ea1622"
+    },
+    "examples/enterprise-text2sql/ui/src/agent-conversation.test.js": {
+      "kind": "file",
+      "sha256": "0a67897780540c8e4c6f4a49057a243446f1acdf95a0c8b53cace05be3361a76"
+    },
+    "examples/enterprise-text2sql/ui/src/agent-results.js": {
+      "kind": "file",
+      "sha256": "6b4989e86775bce05bcd4bd9ee973e84bb2820bf2af4cf61db7f6ea03a441d31"
+    },
+    "examples/enterprise-text2sql/ui/src/agent-results.test.js": {
+      "kind": "file",
+      "sha256": "13c29e9130947917deeeda88e20c9ee976eb053cfa4bdb87fcc00dc8da1d72e3"
+    },
+    "examples/enterprise-text2sql/ui/src/analytics.js": {
+      "kind": "file",
+      "sha256": "eb1f58c5de100b7e749e48fbc1c8de19f101caa39768c802ba37b97b0fded4b0"
+    },
+    "examples/enterprise-text2sql/ui/src/analytics.test.js": {
+      "kind": "file",
+      "sha256": "a513665a342b40cbbc63a8d7e1504ff96247948a54fa061fe347bda01bfc545e"
+    },
+    "examples/enterprise-text2sql/ui/src/api.js": {
+      "kind": "file",
+      "sha256": "b67b39eb4799ab167a25a4022a49fa921aedc1a45e93d11ee25211e2ea82516e"
+    },
+    "examples/enterprise-text2sql/ui/src/api.test.js": {
+      "kind": "file",
+      "sha256": "c3e45f0db1124acd462349691017e41e992b85123d7508b5c527a4ca55e1232f"
+    },
+    "examples/enterprise-text2sql/ui/src/main.js": {
+      "kind": "file",
+      "sha256": "5d2f4c0f5d289c2624f3569aea0b5a48e48cb0d22ef5f57a5ba47d64a0ec7969"
+    },
+    "examples/enterprise-text2sql/ui/src/oidc.js": {
+      "kind": "file",
+      "sha256": "093f7a163b19449c66c4e4dbc88c67f7bde5f492551698b8838907540ecd9826"
+    },
+    "examples/enterprise-text2sql/ui/src/oidc.test.js": {
+      "kind": "file",
+      "sha256": "af2e34c5f45f979a5c2f2d7595219a95b8b9f11e95367b95179b2a1b76d35dde"
+    },
+    "examples/enterprise-text2sql/ui/src/report.js": {
+      "kind": "file",
+      "sha256": "0ccc04d79704269118f2c5b1b79ced9d900ed2305d17b761b56f4372bf044a71"
+    },
+    "examples/enterprise-text2sql/ui/src/report.test.js": {
+      "kind": "file",
+      "sha256": "1fb005f5a5aa95b6f5a00a8a05171cd22f33ac9d61ffde15fc2283a26d4530b8"
+    },
+    "examples/enterprise-text2sql/ui/src/style.css": {
+      "kind": "file",
+      "sha256": "7b0372a17be63ab49357dc1184a67bf36dea32a305ed81a95d087d39b64a147f"
+    },
+    "examples/enterprise-text2sql/ui/vite.config.js": {
+      "kind": "file",
+      "sha256": "bc0fbe5dfb0aeb32b3304d1ad38ab088ca682f92f3699b33d8bf7926058895e7"
+    },
+    "packages/dbgpt-app/hatch_build.py": {
+      "kind": "file",
+      "sha256": "a2a8b5ddc85befd1484384e911c5eec57f483142e8e1f072be06b754a28ba86d"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/component_configs.py": {
+      "kind": "file",
+      "sha256": "3cb7467378f26a0917e5324b7661e170681b72661967eb510787df9c7b7dab63"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/initialization/db_model_initialization.py": {
+      "kind": "file",
+      "sha256": "eb69119dc398643a6b760ac2458936cfac3352ad95b00ea1345bd904f3b8abbe"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/initialization/workspace_provisioning.py": {
+      "kind": "file",
+      "sha256": "ebb7903ee9671d6862e20686d4342c37496a5b289092dace52324cf0daa4b81e"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/knowledge/api.py": {
+      "kind": "file",
+      "sha256": "185c994c00d18916f1107c2befd38db37387fbadad0b76ebb511c4bb7b181bdd"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/knowledge/service.py": {
+      "kind": "file",
+      "sha256": "7e51b8810f95e6542f7e596a46c078ab0151f195e186082ead036725384af757"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/knowledge/tests/test_knowledge_quota_guard.py": {
+      "kind": "file",
+      "sha256": "fba5ea7639a03e8adbbfc180210b4192da83aecf83e6b697d367aecd3e1cdf74"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/agentic_data_api.py": {
+      "kind": "file",
+      "sha256": "53365d990606bda1a9cab673fd6d409679efe2c51351a6e572e8a436433ed074"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/api_v1.py": {
+      "kind": "file",
+      "sha256": "4893183a7f80646c8a2d2355758c88729045619416dadd0c4ca643079bb5e343"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/business_context.py": {
+      "kind": "file",
+      "sha256": "0f9d42baafc22c56324f5ceebe7103d9fe2a995d769b7eba5950e6af1a1896b9"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/editor/api_editor_v1.py": {
+      "kind": "file",
+      "sha256": "0766a7063406f9384db6fd9189d481b094de861d98cfc5b0c09bce3c1fbd1abf"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/editor/service.py": {
+      "kind": "file",
+      "sha256": "a9d3446c6df6836e4e2aaf1d08ad3a987f0536f5893ef6dafb47dae36adf26f8"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/editor/tests/test_chart_run.py": {
+      "kind": "file",
+      "sha256": "9df0bbd0f6737dce2c15277605e9202bb0691b5c59b84b54349a1303f3757548"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/sql_result_events.py": {
+      "kind": "file",
+      "sha256": "4840326a588beeb93eea9eb595a2b8838e3de8c1617843b7c1bfb99a2311fadc"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/subagent/dispatcher.py": {
+      "kind": "file",
+      "sha256": "64f7f59e39bd5dde739907bd986782e152fe8a3067e0256c50efb3cc20cc4105"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/subagent/react_tools.py": {
+      "kind": "file",
+      "sha256": "f03c5ce9276ae3b9c6c6e6f1609b37084b2ecda6f689f6c8ee2127d88f94d4d0"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/subagent/tests/test_dispatch_tool.py": {
+      "kind": "file",
+      "sha256": "eb6a4bff00629a24cca741050fcb746957c54a5282409c161d23c1c4f86c86e8"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/subagent/tests/test_dispatcher.py": {
+      "kind": "file",
+      "sha256": "130b374835506f0774336d6d378cb0e7755aa61be0a2be312a997fc2443c5928"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/subagent/tests/test_react_tools.py": {
+      "kind": "file",
+      "sha256": "9e9762fc91f69962f2db87acae28dcb3d231b6765ece1de93c3f4f34c50869f7"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tests/test_agent_file_download_auth.py": {
+      "kind": "file",
+      "sha256": "f2e6ed7f224effbdeeb5996501f4d1a41a5b3378408ecd0b4e41ac40ef293f79"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tests/test_agentic_data_api_lifecycle.py": {
+      "kind": "file",
+      "sha256": "59eb23379b1fc19da69f12520b6b9c2784900d4f5b83b6d69c27594584df2191"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tests/test_business_context.py": {
+      "kind": "file",
+      "sha256": "5746561f79430a26cb3c43a60b80bd3d0fe166245f21d1c73acc255af037626a"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tests/test_chat_quota_modes.py": {
+      "kind": "file",
+      "sha256": "cff22e9ace31f23e65114c99728d1e0fe64e0c5d8f75e7f46c2799cd05388dd6"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tests/test_database_workflow_prompt.py": {
+      "kind": "file",
+      "sha256": "30f4376326500c87275af62ce8f7e5d364e09577668287895d27b355a112d6d2"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tests/test_datasource_api_redaction.py": {
+      "kind": "file",
+      "sha256": "45e18086927ab27498f7a5821a16b770e48941173f50b99bc48cd14c79e8a0bf"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tests/test_sql_result_events.py": {
+      "kind": "file",
+      "sha256": "15a152e802ca15438180889df9298c78a507c0a45b1e0266eee3d2fc93c20e6f"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tests/test_token_quota.py": {
+      "kind": "file",
+      "sha256": "d1c21c3347d1b4dfec36cb93c77909f7d981b49840810dfe9077c2932722bba7"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/token_quota.py": {
+      "kind": "file",
+      "sha256": "3775d96a5a8272f3a481fa5a117677cb92602388a0741c05dc2a601a3115e73a"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/__init__.py": {
+      "kind": "file",
+      "sha256": "1bc1575a10cd631ad465afb54be602207b7ee01b6688e9fbadec18d38320c04f"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/code_interpreter.py": {
+      "kind": "file",
+      "sha256": "521070f1a259d41d45f84526dcbf4eea5b2c35825237c39139b4c9d770912259"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/execute_analysis.py": {
+      "kind": "file",
+      "sha256": "97c6f8efa6bc1be7ea4b78a3337d6d81f62a7378f46549e3fcde0da306e1739e"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/execute_tool.py": {
+      "kind": "file",
+      "sha256": "f161729a25d3f2e19eac5ef64e55f6f0fca1691526fb9d077e048bfaa51ff67d"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/html_interpreter.py": {
+      "kind": "file",
+      "sha256": "38bb7a88bca3691ac8a11a352c421ef560cab32abb6989eff6b25c1d7e932a9d"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/kb_tools.py": {
+      "kind": "file",
+      "sha256": "6ac000be626a19b44fe33f0e1c13bba5bbc0861119ac6c030deb857f3c48a4b2"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/knowledge_retrieve.py": {
+      "kind": "file",
+      "sha256": "c9d56cf59e9f796b54f4f5a65c3c5c498cdb599981292d000064f3731fffe52e"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/load_file.py": {
+      "kind": "file",
+      "sha256": "2e44a9cb724f13977bf370722bf5046df7f73b76af11f99e25ed3e13fbc87a73"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/load_tools.py": {
+      "kind": "file",
+      "sha256": "f93cf869b53055ae276a2c5ca7f4f6c7b6836984ae50920e8a1de71a7e44f29d"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/metric_catalog.py": {
+      "kind": "file",
+      "sha256": "1b71538d0dc32ae65c3bd445b15298d76e7a4f5b92cf7aead42b088e79e10ef6"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/metric_query.py": {
+      "kind": "file",
+      "sha256": "1801805159d5f34ff67f8a22845a691324df5ce44a67dd4019f938c1e875228a"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/question.py": {
+      "kind": "file",
+      "sha256": "e29f28712c4da1a8ba2875e43044db0216b287c45b9832aec242faa4366ce33d"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/read_file.py": {
+      "kind": "file",
+      "sha256": "252168667ce8784ef282f1ebc3e6064eb254fdcb8b63de276c275889c5e4170e"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/select_skill.py": {
+      "kind": "file",
+      "sha256": "d5db129c140c41a868e9f9f1b42f632f225387cbb1605d1077f5f3eada8a4840"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/shell_interpreter.py": {
+      "kind": "file",
+      "sha256": "4471994fd00ba432c9be33261766594616d5bcae9a3e25abeb1e776c304abf85"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/skill_tools.py": {
+      "kind": "file",
+      "sha256": "d8d0768902380876ef9f0c6b80f96474dd763dd1962b7c92e79773b4bdb40c93"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/sql_guard.py": {
+      "kind": "file",
+      "sha256": "f9496c69ac83c3cd95bf2ce453d28031e3537d5a89c939f5178f3dac3c0c5dd3"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/sql_query.py": {
+      "kind": "file",
+      "sha256": "1b2a54aae2059bf432d147b0e010cbca457b93957a38b44b1d0747f41a345ee7"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/tests/test_session_file_tools.py": {
+      "kind": "file",
+      "sha256": "d7bfa4a72c0b51c15d322e4370df5edb24b97b284001ff97c4422582f5e46da5"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/tests/test_sql_guard.py": {
+      "kind": "file",
+      "sha256": "cdec07f4e8bdf9e105d062e55a7e65f54e3d0e0fe543d871aecb316abe8bd550"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/tests/test_sql_query.py": {
+      "kind": "file",
+      "sha256": "ff507d91302f6239b183379bf1a94a177cb8e0d9ebba0cec33350a0c99489ccf"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/tests/test_tool_tracing.py": {
+      "kind": "file",
+      "sha256": "7233ed306d1d460778a990519fc431489d367bfe63958fec8490c26f1a15808a"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/todowrite.py": {
+      "kind": "file",
+      "sha256": "c20b8f584674b5138cff73377837bd9034436b06c9951d4634a434d504e73f89"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/tool_tracing.py": {
+      "kind": "file",
+      "sha256": "5978e1d24799fe5bcfb9638c7b264cc29f6e29511b3813bd6d5a6a47a5eeba26"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v2.py": {
+      "kind": "file",
+      "sha256": "815816592f217f38811997d31388744e93a9c2137d9793c4b1e5d2798f2f7da9"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/tests/test_api_v2_token_quota.py": {
+      "kind": "file",
+      "sha256": "d2c221579f6c069fbd99b2b38a3197e19be869d28112f7341fc896e4f0f171e9"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/scene/base_chat.py": {
+      "kind": "file",
+      "sha256": "615b11bf9f1e0e09e7aa02c0a97ea39cc8baad017acfe64aa317843ee6cd4b5a"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/scene/chat_dashboard/chat.py": {
+      "kind": "file",
+      "sha256": "ee4e84fe90b1062ce75a8e0e9b1adfe654aca468488504701c6e00d541e6f0e2"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/scene/chat_dashboard/data_loader.py": {
+      "kind": "file",
+      "sha256": "694be8b93594ad65a6d7d41cd83457d72aab34675f42d2535284b699aa540d22"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/scene/chat_dashboard/tests/test_chat_policy.py": {
+      "kind": "file",
+      "sha256": "4014f3d29a562091b27fdba835b07381062d8fd5e6d07bbd2a0c93c33eb498ad"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/scene/chat_dashboard/tests/test_data_loader_sql_guard.py": {
+      "kind": "file",
+      "sha256": "814923903675c4b5e2752758b28bf4a0a79c5a7b79c3516e9b60a040a55c4d98"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/tests/test_agentic_multi_file_flow.py": {
+      "kind": "file",
+      "sha256": "e8c04303f4cab8fa671c989bd8e1598c3e56e49646515be4852614aaa021518d"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/tests/test_agentic_multi_file_security.py": {
+      "kind": "file",
+      "sha256": "9b3419b5c71680203f14704a1fd7852001cc4f8af6d9c150afc0cf0b92881ee3"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/tests/test_attachment_react_adapter.py": {
+      "kind": "file",
+      "sha256": "af7ae3a6c08fa945fc8d6c9a200802110b3b76c494ac6faa8913226ca800f4b8"
+    },
+    "packages/dbgpt-core/pyproject.toml": {
+      "kind": "file",
+      "sha256": "73ec8619ad543dadbc7720bded3587c858d5fee89341c1443ea4526554406a9c"
+    },
+    "packages/dbgpt-core/src/dbgpt/agent/resource/database.py": {
+      "kind": "file",
+      "sha256": "505f234484e964047330647b844899558b33bb603b1e5f5d886c88601d6b97c7"
+    },
+    "packages/dbgpt-core/src/dbgpt/agent/resource/manage.py": {
+      "kind": "file",
+      "sha256": "5c563f0b8730b53ea2f10ed6bb2346010f2dc7452ac417d97c3b25a7831b7179"
+    },
+    "packages/dbgpt-core/src/dbgpt/agent/resource/tests/test_database_resource_sql_guard.py": {
+      "kind": "file",
+      "sha256": "41b34fe1e6e27511324e01bbb332ede801c1dcc5cc9427796200ddb5736d5b63"
+    },
+    "packages/dbgpt-core/src/dbgpt/agent/resource/tool/pack.py": {
+      "kind": "file",
+      "sha256": "f5e6a0478a26758f3b11f1a2a445dbd38cdb8ecea16cbc0dde7911feb153b25b"
+    },
+    "packages/dbgpt-core/src/dbgpt/agent/resource/tool/tests/test_base_tool.py": {
+      "kind": "file",
+      "sha256": "797d515091b04bfed16c744e9161e0a05de9f070ba4f5240dcf2a0d0804e1bad"
+    },
+    "packages/dbgpt-core/src/dbgpt/core/awel/tests/trigger/test_http_trigger_quota.py": {
+      "kind": "file",
+      "sha256": "5eb8b095cc8c16e86f53703fa900e91edd70912e0bf8e1c03fbc548d422b4302"
+    },
+    "packages/dbgpt-core/src/dbgpt/core/awel/trigger/http_trigger.py": {
+      "kind": "file",
+      "sha256": "9ec3558cc2d07b48634e72c25952200f69b5d647cb9b296e102b0d4433c74681"
+    },
+    "packages/dbgpt-core/src/dbgpt/core/interface/operators/llm_operator.py": {
+      "kind": "file",
+      "sha256": "562d1fcf9987d355fea7a38d21b892c2c69d618c01f87964f315d5b16a06448c"
+    },
+    "packages/dbgpt-core/src/dbgpt/core/interface/operators/tests/test_llm_client_wrapper.py": {
+      "kind": "file",
+      "sha256": "5450e9f3b05c8505a3044fb1299fa003f286608cb9017b9a470af57c48eafffb"
+    },
+    "packages/dbgpt-core/src/dbgpt/datasource/rdbms/base.py": {
+      "kind": "file",
+      "sha256": "154ca440847db5544703c0f6bc9396ffda958b96fce4dcc7b095d10fc26f1e2b"
+    },
+    "packages/dbgpt-core/src/dbgpt/datasource/sql_guard.py": {
+      "kind": "file",
+      "sha256": "d00c7d5a4fd66b168698cbcea737d6570cc42717d4102a75ac6ca88265d3b728"
+    },
+    "packages/dbgpt-core/src/dbgpt/datasource/tests/test_postgresql_tenant_rls_integration.py": {
+      "kind": "file",
+      "sha256": "2da25e2da6fe9da0d3c2f0bfe8baa57c18f974c06c3e69b48fd406edb0da6520"
+    },
+    "packages/dbgpt-core/src/dbgpt/datasource/tests/test_rdbms_timeout.py": {
+      "kind": "file",
+      "sha256": "8cb26c399c14beb3cfd90eec6b9ae93250bd6fc1a498205184272f7171e36b3f"
+    },
+    "packages/dbgpt-core/src/dbgpt/datasource/tests/test_sql_guard.py": {
+      "kind": "file",
+      "sha256": "8e4c412ce812a3018e911129f07e45357371de89b283031472dd84082cb028cd"
+    },
+    "packages/dbgpt-core/src/dbgpt/datasource/tests/test_sql_guard_tracing.py": {
+      "kind": "file",
+      "sha256": "5751168ea6346b106fbda3c36a747f730615ab2db2b7803fc2304ef01d356723"
+    },
+    "packages/dbgpt-core/src/dbgpt/model/operators/llm_operator.py": {
+      "kind": "file",
+      "sha256": "97092c374adf665cab620ff87705c2f4ca24af70d75f4027c6e8f4db3977ba8d"
+    },
+    "packages/dbgpt-core/src/dbgpt/model/proxy/llms/ollama.py": {
+      "kind": "file",
+      "sha256": "befc25385a34e03fdcd0f75543795d26d03662e098e8410c4b7c25f13bcb8e7b"
+    },
+    "packages/dbgpt-core/src/dbgpt/model/utils/provider_test.py": {
+      "kind": "file",
+      "sha256": "59e1797f9f9ddd87ef0680555b1f8362637db1dc644286f0bf5a3887ea8ee6b5"
+    },
+    "packages/dbgpt-core/src/dbgpt/rag/extractor/summary.py": {
+      "kind": "file",
+      "sha256": "0b6e6adef02ee11ad8ef98881fe96f2f864b176e065337381b575aadc72cc8a4"
+    },
+    "packages/dbgpt-core/src/dbgpt/rag/extractor/tests/test_summary_extractor.py": {
+      "kind": "file",
+      "sha256": "b1b811e7fa7689b96c9dc234f7cfde45fb1e85f64f01f3e1d80917dc21656ee9"
+    },
+    "packages/dbgpt-core/src/dbgpt/rag/retriever/rewrite.py": {
+      "kind": "file",
+      "sha256": "3398e261353ae17a71a32e1a8a74c89bcb796c62071945dccbabaad621a25d7d"
+    },
+    "packages/dbgpt-core/src/dbgpt/rag/transformer/llm_extractor.py": {
+      "kind": "file",
+      "sha256": "c58dd1ca2deedf6b8827306182c820cb58636cd81bd9b7a58ff3f2eb0a49954b"
+    },
+    "packages/dbgpt-core/src/dbgpt/util/tracer/tests/test_otlp_exporter.py": {
+      "kind": "file",
+      "sha256": "a270430e77203a0291a3dbd2a9c73e5eb33da61685137a47730fef4fcb66b457"
+    },
+    "packages/dbgpt-core/src/dbgpt/util/tracer/tests/test_tracer_impl.py": {
+      "kind": "file",
+      "sha256": "849b0222b1e04497c67a4d7fff596c8b61bcc0810415f8cad7e675e649b149ae"
+    },
+    "packages/dbgpt-core/src/dbgpt/util/tracer/tests/test_tracer_middleware.py": {
+      "kind": "file",
+      "sha256": "904d9170b1a32b87793fc3cb8317f253bf043bd61c6bd8d6bbd1893b8da3f4a4"
+    },
+    "packages/dbgpt-core/src/dbgpt/util/tracer/tracer_impl.py": {
+      "kind": "file",
+      "sha256": "9dad072283c6f9bbe72c54fc546e11d0a45471be277b48e076fbe977f995f35f"
+    },
+    "packages/dbgpt-core/src/dbgpt/util/tracer/tracer_middleware.py": {
+      "kind": "file",
+      "sha256": "ca38ff603e05909b8a3c0777cb489b445b288188cbb10e28cc442564629a0564"
+    },
+    "packages/dbgpt-ext/src/dbgpt_ext/datasource/conn_spark.py": {
+      "kind": "file",
+      "sha256": "70d177f09d6d3f64d743fbacec40bf5ec028effdd1f01dc2616b6911bd063d59"
+    },
+    "packages/dbgpt-ext/src/dbgpt_ext/datasource/rdbms/conn_postgresql.py": {
+      "kind": "file",
+      "sha256": "b292b12622c0fcdb28bf00b5e8340dd3dfd0cbf8f725835fea71c41abc7c4d62"
+    },
+    "packages/dbgpt-ext/src/dbgpt_ext/datasource/rdbms/tests/test_conn_sqlite.py": {
+      "kind": "file",
+      "sha256": "aec18d7ebc93f19722390cea92eb1270144edf5fa09129549706a8b3b06299ad"
+    },
+    "packages/dbgpt-ext/tests/test_conn_spark.py": {
+      "kind": "file",
+      "sha256": "22569c6eb675a851e1a27f3292c0f2866cc9388f5de6e5c60dc106dbcc1af90d"
+    },
+    "packages/dbgpt-serve/pyproject.toml": {
+      "kind": "file",
+      "sha256": "e5826ae84df9bec407ad37121226fa869b57638a7ac2d0f55f4608ac5b03aa2a"
+    },
+    "packages/dbgpt-serve/src/dbgpt_serve/agent/agents/app_agent_manage.py": {
+      "kind": "file",
+      "sha256": "c0ab454d4df3bfd81edfa5a95cccdd51c70c7c3066dcfc12ae0bd902ca52858d"
+    },
+    "packages/dbgpt-serve/src/dbgpt_serve/agent/agents/controller.py": {
+      "kind": "file",
+      "sha256": "ee5d79efcd0d911260cc90d815f5828844f378d7c935727e4d75d5b0e71dcfbd"
+    },
+    "packages/dbgpt-serve/src/dbgpt_serve/agent/agents/expand/actions/volatility_analysis_action.py": {
+      "kind": "file",
+      "sha256": "c3a26b82e73953647fb6609aa9b7f74b535f13cff29e9c65ec53f99ce9917cde"
+    },
+    "packages/dbgpt-serve/src/dbgpt_serve/agent/agents/expand/tests/test_quota_guard.py": {
+      "kind": "file",
+      "sha256": "4ac8851a1fcbf979c165ef6c0f88444eca3575c19c670df3ba3f6061e0954f9f"
+    },
+    "packages/dbgpt-serve/src/dbgpt_serve/agent/resource/datasource.py": {
+      "kind": "file",
+      "sha256": "90d3f89adecf556ab8c02f0f31cd494e4d3888f1b1126141bffc23c0047ab904"
+    },
+    "packages/dbgpt-serve/src/dbgpt_serve/agent/resource/tests/test_datasource_execution_identity.py": {
+      "kind": "file",
+      "sha256": "6d05b33a54dafb745cccee6eaadd265571772b628196a39c2ff6a8652663a4aa"
+    },
+    "packages/dbgpt-serve/src/dbgpt_serve/datasource/api/endpoints.py": {
+      "kind": "file",
+      "sha256": "d6d6a7d1f4ce54899f0677126fc37e1e8697ec5a5b997e0ef70b3791d030ee15"
+    },
+    "packages/dbgpt-serve/src/dbgpt_serve/datasource/api/schemas.py": {
+      "kind": "file",
+      "sha256": "6768d7237288dae95a8293cabbee1d2a8490bc93d8ac076875937f9a42f5f80e"
+    },
+    "packages/dbgpt-serve/src/dbgpt_serve/datasource/manages/connect_config_db.py": {
+      "kind": "file",
+      "sha256": "374f5c352ede1689fe9b0bbd82a78dd2edab6dc23b309dc084c3d98fe49e4ff0"
+    },
+    "packages/dbgpt-serve/src/dbgpt_serve/datasource/manages/connector_manager.py": {
+      "kind": "file",
+      "sha256": "a4a414c8adc91b91d7512ccf1311b643e640f9f0e372221bba22ba3480467aad"
+    },
+    "packages/dbgpt-serve/src/dbgpt_serve/datasource/security.py": {
+      "kind": "file",
+      "sha256": "5d55ceb1d05b395e52074ff56c4f4e8300391aa685559ad331d6fe0fa80d1116"
+    },
+    "packages/dbgpt-serve/src/dbgpt_serve/datasource/service/service.py": {
+      "kind": "file",
+      "sha256": "112d30e41593208e1edcd886fc8b7a190024452ff7571a6aaef29a0b5b1b0a7a"
+    },
+    "packages/dbgpt-serve/src/dbgpt_serve/datasource/tests/test_connect_config_db.py": {
+      "kind": "file",
+      "sha256": "5bb46b05fe53503990a1e9a05c4403bbc71cb75a0bef4271aedc1c268345bf43"
+    },
+    "packages/dbgpt-serve/src/dbgpt_serve/datasource/tests/test_endpoints_auth.py": {
+      "kind": "file",
+      "sha256": "83f3e56492d418ef11bb954f5ec17a7e2dac4c4c5e940172353f78b9fe588056"
+    },
+    "packages/dbgpt-serve/src/dbgpt_serve/datasource/tests/test_security.py": {
+      "kind": "file",
+      "sha256": "a2b19315c05e302fc315944719cd741c96f13f6246225abf01936baad2c484e0"
+    },
+    "packages/dbgpt-serve/src/dbgpt_serve/evaluate/api/endpoints.py": {
+      "kind": "file",
+      "sha256": "fde210cc21be7ea1d2778a90bf486712f0d3cb2e6d3f2f2fdae0950f2f8ce0b1"
+    },
+    "packages/dbgpt-serve/src/dbgpt_serve/evaluate/api/tests/test_evaluate_quota_guard.py": {
+      "kind": "file",
+      "sha256": "73c3f6b1391688c0b60b1123da3de3a824b97e02796c8bbd573e6f450fdc9bec"
+    },
+    "packages/dbgpt-serve/src/dbgpt_serve/flow/api/endpoints.py": {
+      "kind": "file",
+      "sha256": "b5e7f080a8cc0e1db1cf8fd210c2176aa11c2adaa7a95dc53441c184f3d1d101"
+    },
+    "packages/dbgpt-serve/src/dbgpt_serve/flow/tests/test_endpoints.py": {
+      "kind": "file",
+      "sha256": "f81c3d0173039bd9c4ae5940664e3f410eebc6a50dfeb2cdbaa362f3c04bf7a1"
+    },
+    "packages/dbgpt-serve/src/dbgpt_serve/prompt/api/endpoints.py": {
+      "kind": "file",
+      "sha256": "885f06be0f9aa86b9956bd12ca583e06f3e453cc5e26f40075e6033d6ad094cc"
+    },
+    "packages/dbgpt-serve/src/dbgpt_serve/prompt/service/service.py": {
+      "kind": "file",
+      "sha256": "b39d2640168e7447d751f23f6f4c66136ff186a30ed1ee2617ef791c25b20728"
+    },
+    "packages/dbgpt-serve/src/dbgpt_serve/prompt/tests/test_endpoints.py": {
+      "kind": "file",
+      "sha256": "18a2a4be832a1ec2b547deea238d261a23d355cdda0266e56e1490314d40430f"
+    },
+    "packages/dbgpt-serve/src/dbgpt_serve/rag/api/endpoints.py": {
+      "kind": "file",
+      "sha256": "ba5f7d436d37fa380c90a9ff474708dfdf4e1d27e8f5d3b2b94635dffb12eb45"
+    },
+    "packages/dbgpt-serve/src/dbgpt_serve/rag/retriever/knowledge_space.py": {
+      "kind": "file",
+      "sha256": "a9071a9a2f515751b33e141b80c9485fc7da8d9aab29ee3423a2836ec33d3888"
+    },
+    "packages/dbgpt-serve/src/dbgpt_serve/rag/service/service.py": {
+      "kind": "file",
+      "sha256": "a63d108020e67d17b684192f335bcd6f7bb3acfed8d3af3b3b104c8cd2e416ba"
+    },
+    "packages/dbgpt-serve/src/dbgpt_serve/rag/tests/test_service.py": {
+      "kind": "file",
+      "sha256": "97763ce0bb693834ea135ba17cc4d919fe30bb1ca651e530399c04e93fe59b2d"
+    },
+    "packages/dbgpt-serve/src/dbgpt_serve/token_quota/__init__.py": {
+      "kind": "file",
+      "sha256": "ea0f3caee193abd5a022df1a1ede7b363c52d69a0cf74b89f74499f6dae5e180"
+    },
+    "packages/dbgpt-serve/src/dbgpt_serve/token_quota/models/__init__.py": {
+      "kind": "file",
+      "sha256": "3014284dc7b7b3138d347bb39c351ee1997baf2b5ecf92e6735dd16df6a57e50"
+    },
+    "packages/dbgpt-serve/src/dbgpt_serve/token_quota/models/dao.py": {
+      "kind": "file",
+      "sha256": "4011b3b4a2d07f9b2e54c9baff81a6392f18f7623429e6569676c455eb8f9cef"
+    },
+    "packages/dbgpt-serve/src/dbgpt_serve/token_quota/models/models.py": {
+      "kind": "file",
+      "sha256": "91d7e4cf50f633d482276419d0dd1a4bf3815fc97254fbbae9d6c81b16ed8d25"
+    },
+    "packages/dbgpt-serve/src/dbgpt_serve/token_quota/tests/__init__.py": {
+      "kind": "file",
+      "sha256": "47dae4aad935e65b4694b483b9e3e2ba04a6b8270218c91698d2b1a783dc7901"
+    },
+    "packages/dbgpt-serve/src/dbgpt_serve/token_quota/tests/test_dao.py": {
+      "kind": "file",
+      "sha256": "9a339245056b60649efc35a5d67a7ba849ab110c013453ee814d25b62de5687f"
+    },
+    "packages/dbgpt-serve/src/dbgpt_serve/utils/auth.py": {
+      "kind": "file",
+      "sha256": "e1fc5fa9abdaf6790803d8805d7533f1421905cb615e8b399943eebf5a7219dd"
+    },
+    "packages/dbgpt-serve/src/dbgpt_serve/utils/tests/test_auth_execution_context.py": {
+      "kind": "file",
+      "sha256": "c2bc6d931bc66cf9b2abd7b13d01b5cc474f8db06065f83619ca1103d28a1355"
+    },
+    "packages/dbgpt-serve/src/dbgpt_serve/utils/tests/test_token_quota.py": {
+      "kind": "file",
+      "sha256": "f9eccfc42c16f8815fca08e41762ddc4cc73f2c175666486b01f9bf419def6dc"
+    },
+    "packages/dbgpt-serve/src/dbgpt_serve/utils/token_quota.py": {
+      "kind": "file",
+      "sha256": "2fd26cf9be1a66f007544b0b4ee1318a5f899ae373d7e26144a9bd23b58f4b5c"
+    },
+    "packages/dbgpt-serve/src/dbgpt_serve/utils/token_quota_client.py": {
+      "kind": "file",
+      "sha256": "0189b566a2da348538b4ee2a7dbdd905c7d08312167f0ec427c6522ea40317be"
+    },
+    "specs/001-admin-margin-ui/plan.md": {
+      "kind": "file",
+      "sha256": "997a585e26389020abaa6eed2c2d6f76b45e3f50315a2c69e8919bedbf19c42b"
+    },
+    "specs/001-admin-margin-ui/scope-baseline-T001.json": {
+      "kind": "file",
+      "sha256": "0f08073cc1fc986c8f2c4687552a1a1db00beaa6abeb42d935bd58957c00de35"
+    },
+    "specs/001-admin-margin-ui/scope-baseline-T002.json": {
+      "kind": "file",
+      "sha256": "3c41f68e1b569ea880376c3d06b19c1d41a7884100d2477cb051c880f1784cbc"
+    },
+    "specs/001-admin-margin-ui/scope-report-T001-preflight.json": {
+      "kind": "file",
+      "sha256": "2726d39fbece654b20eb0148a46bb879385beba11c8e4ab8e43498fbb6d8a0a9"
+    },
+    "specs/001-admin-margin-ui/scope-report-T001.json": {
+      "kind": "file",
+      "sha256": "c31c1d514f4ba05f20225b5b75185b3540d4014027d46a8997b2381e5ef79f6f"
+    },
+    "specs/001-admin-margin-ui/scope-report-T002.json": {
+      "kind": "file",
+      "sha256": "022c1c2e54746b734b428f0b4bfc6a85b0340175a05c97e6ddc94cf8616c6325"
+    },
+    "specs/001-admin-margin-ui/spec.md": {
+      "kind": "file",
+      "sha256": "e99255838644a7ddf740fcc80950631bc968b44f717b990c3c1820691a3c69b1"
+    },
+    "specs/001-admin-margin-ui/tasks.md": {
+      "kind": "file",
+      "sha256": "6f267948da59be7d632082af2407c5ef9cca9fa331bb3793dc4a400afa8e2364"
+    },
+    "specs/001-admin-margin-ui/verify.md": {
+      "kind": "file",
+      "sha256": "906b20debb8e3f0b6286df2cc86b66ee423ecf10c8dcd2024287b4db89053da5"
+    },
+    "specs/002-datasource-governance/plan.md": {
+      "kind": "file",
+      "sha256": "a158c34f5c5033533e855cb063ba48c5f601ade88c2e085113fbdefb4b1e01ac"
+    },
+    "specs/002-datasource-governance/scope-baseline-T001.json": {
+      "kind": "file",
+      "sha256": "b0902c18f925acac9cee03fe2f7b48c81c425098f2066a9d395623cd385b6297"
+    },
+    "specs/002-datasource-governance/scope-baseline-design.json": {
+      "kind": "file",
+      "sha256": "7b0c0a947021b64b546bd809725d986eabb0049fc0adce8ad8d69941cd2db557"
+    },
+    "specs/002-datasource-governance/scope-report-design.json": {
+      "kind": "file",
+      "sha256": "0becb1f5785dc0d115bc0aefb1e77d1e168f328e38f509aaaddc9d5d3b7ba1f6"
+    },
+    "specs/002-datasource-governance/spec.md": {
+      "kind": "file",
+      "sha256": "63902b433417bfead271a24d729be464e53f1b153f120fc239729941fd949c22"
+    },
+    "specs/002-datasource-governance/tasks.md": {
+      "kind": "file",
+      "sha256": "9b325e48d15b23e59ec66d80a42245db97ae5382df24cdeef0ff7cd121dcb558"
+    },
+    "specs/002-datasource-governance/verify.md": {
+      "kind": "file",
+      "sha256": "83a73e8069f262d4e63e8af390d22c80a1b53248260533ca868ba44ba43b24a8"
+    },
+    "specs/003-order-aware-evaluation/plan.md": {
+      "kind": "file",
+      "sha256": "cac8afa2fd29d5bb0c7c5e1c91a4edf677fe153b1ac35afe75bf54f54fe0b84a"
+    },
+    "specs/003-order-aware-evaluation/scope-baseline-T001.json": {
+      "kind": "file",
+      "sha256": "f3e2ef4898fd4f901e9907abf31d0abcc2e6b21684be5e00eca18c32f7edc290"
+    },
+    "specs/003-order-aware-evaluation/scope-baseline-T002-final.json": {
+      "kind": "file",
+      "sha256": "59e8e764c17b940209aa1f5d0dcc17f95bc8c5b136710bbc52c62193379f07c9"
+    },
+    "specs/003-order-aware-evaluation/scope-baseline-T002.json": {
+      "kind": "file",
+      "sha256": "9c0a9f31dd207695001b6b4820026079401e6e015482d054b6898af626f61faf"
+    },
+    "specs/003-order-aware-evaluation/scope-report-T001-final.json": {
+      "kind": "file",
+      "sha256": "3b66aa988e5408df4585404631a55b932176fda83a69b5f6054fef6aa99d5f87"
+    },
+    "specs/003-order-aware-evaluation/scope-report-T001.json": {
+      "kind": "file",
+      "sha256": "166a84d495a47281943e41cf390901ce90de0dc8e5cd9031992e829a93c49f53"
+    },
+    "specs/003-order-aware-evaluation/scope-report-T002.json": {
+      "kind": "file",
+      "sha256": "c74b074e61bfcb4830e75255a822d799636ef590e5147b2dee60fd4529fa0a34"
+    },
+    "specs/003-order-aware-evaluation/spec.md": {
+      "kind": "file",
+      "sha256": "2e1a58fabd755f123c0ba9374bb10ad7e8b4afcacc184987d7c516fd87d9c3d1"
+    },
+    "specs/003-order-aware-evaluation/tasks.md": {
+      "kind": "file",
+      "sha256": "9674b23913b223e1f4347a68232b164cc3a16d953cbbd55ada6e60bdbaa717a2"
+    },
+    "specs/003-order-aware-evaluation/verify.md": {
+      "kind": "file",
+      "sha256": "7c396a5b54e935aa8f48b39d7fd67c4894ffab614a69d7b8dd1b47ee56bce045"
+    },
+    "specs/004-chat-token-quota/plan.md": {
+      "kind": "file",
+      "sha256": "110d3fdcde98a74fadaed446992fb764ec32fa98e19236d09e88b72c6d8d4c3a"
+    },
+    "specs/004-chat-token-quota/scope-baseline-T001.json": {
+      "kind": "file",
+      "sha256": "dcc5a608d4417a638f77b2d7974f9ec9512b47429cff4812892db94418191e53"
+    },
+    "specs/004-chat-token-quota/spec.md": {
+      "kind": "file",
+      "sha256": "702c329eec36685a024d1e2541ab5730697565d8f5e4d6c67de456b3955efc00"
+    },
+    "specs/004-chat-token-quota/tasks.md": {
+      "kind": "file",
+      "sha256": "6ff710f4892fb046c38dc12fd23eceb89d6d1d7410c22d47c6be49cba2be1321"
+    },
+    "specs/004-chat-token-quota/verify.md": {
+      "kind": "file",
+      "sha256": "f13ea99cd03f71914cc37ce3ffdc1ed9ae41263b67cc533245a1cf937c2257f5"
+    },
+    "specs/005-postgresql-tenant-rls-context/plan.md": {
+      "kind": "file",
+      "sha256": "580b93e44c9d1c236b44aefbbc5c1969fcc534429353830b56215ccf867f83db"
+    },
+    "specs/005-postgresql-tenant-rls-context/spec.md": {
+      "kind": "file",
+      "sha256": "2661ed40607db0648dcd187437ca0eef7e000cd3a0259f7d424e1afe41079020"
+    },
+    "specs/005-postgresql-tenant-rls-context/tasks.md": {
+      "kind": "file",
+      "sha256": "6a6c07615ca4db8a682b02d8101a880e9fff7f096567efcb64cd8bb44b041a0c"
+    },
+    "specs/005-postgresql-tenant-rls-context/verify.md": {
+      "kind": "file",
+      "sha256": "7478a2458e517f4f42a31435020fc8d25a856d5bd951a02b44235fc00fbbd0be"
+    },
+    "specs/006-serve-datasource-api-auth/spec.md": {
+      "kind": "file",
+      "sha256": "d2bd59be9fb1988afe6583172631e068f76f073dac7f57e9792e8f6abac502bd"
+    },
+    "specs/006-serve-datasource-api-auth/tasks.md": {
+      "kind": "file",
+      "sha256": "b90f5270876c4fff2f27abedf5e3e271cf584e1971f301f20db2ec3014eac23c"
+    },
+    "specs/006-serve-datasource-api-auth/verify.md": {
+      "kind": "file",
+      "sha256": "0d5418a9012dcef495699d87a6be49551ca6cee43ad4d738e74df7a1b4e194c4"
+    },
+    "specs/007-report-template-governance/plan.md": {
+      "kind": "file",
+      "sha256": "16e8ec87261e0376a800cd7c286a1983558bb12575de8cc616ad8821a57e3a66"
+    },
+    "specs/007-report-template-governance/spec.md": {
+      "kind": "file",
+      "sha256": "d8117e0eb589777870c0647dcbee52679b0e4e548d192f3f1ac7840bb198ada8"
+    },
+    "specs/007-report-template-governance/tasks.md": {
+      "kind": "file",
+      "sha256": "513d24bc06c04554b36300e8b9ca5c393b4c7b336827cc3a270097d07105b160"
+    },
+    "specs/007-report-template-governance/verify.md": {
+      "kind": "file",
+      "sha256": "4d168c257b131ae41fa3870f80a44ac69bffc17bd629e88056c1653dc78d5c09"
+    },
+    "specs/008-report-task-shared-database/plan.md": {
+      "kind": "file",
+      "sha256": "c2ce758a05cb1e7e5082c9a211883964d740a639da17c2d101b3ac171a3ec8bd"
+    },
+    "specs/008-report-task-shared-database/spec.md": {
+      "kind": "file",
+      "sha256": "c3509c5a1bee2eaea7222476218cb7f4fc109fb0b7e0e05b3591dcf4800aada5"
+    },
+    "specs/008-report-task-shared-database/tasks.md": {
+      "kind": "file",
+      "sha256": "d1da49f00be04bd1a2379056509b20239d836e6699af45b8866c687cdf0b43a9"
+    },
+    "specs/008-report-task-shared-database/verify.md": {
+      "kind": "file",
+      "sha256": "ed7ce4764bd4919d51dcb7f1964d8100d69aecd699042ce4f33580f85e6f45e7"
+    },
+    "specs/009-agent-token-quota/plan.md": {
+      "kind": "file",
+      "sha256": "e33683bf9a0cceccb92da181c78fc800b9963c09aaeef9ab5db0e23208622cd9"
+    },
+    "specs/009-agent-token-quota/spec.md": {
+      "kind": "file",
+      "sha256": "bd6546c516a3cb2a221cea0845731675671047518c64772054a854806a6835f6"
+    },
+    "specs/009-agent-token-quota/tasks.md": {
+      "kind": "file",
+      "sha256": "14e466fc521e088e5fd3106f650d3b44dc16d6ecb4a951034cc06535e3afdf49"
+    },
+    "specs/009-agent-token-quota/verify.md": {
+      "kind": "file",
+      "sha256": "32eddaa0053389d6ac26577aa3058ac02f22035393dc2a856310a871a5fb20e8"
+    },
+    "specs/010-agent-file-download-auth/plan.md": {
+      "kind": "file",
+      "sha256": "1a67b4fe08802b524de4e519420a4a6baf38739083b1101874d9806d90218828"
+    },
+    "specs/010-agent-file-download-auth/spec.md": {
+      "kind": "file",
+      "sha256": "eaa1fca38de0c7736fb43a70f244a967eb4d060c48d625922b95983b91cdefc3"
+    },
+    "specs/010-agent-file-download-auth/tasks.md": {
+      "kind": "file",
+      "sha256": "44c0bea92275002e179b320ec0e85e8eb48112aaa8991be0dbe7c0a81c6b5f18"
+    },
+    "specs/010-agent-file-download-auth/verify.md": {
+      "kind": "file",
+      "sha256": "ab3ea9abb3dafa007d675f055bf2227b47f410a129bb105d19823862def0005a"
+    },
+    "specs/011-report-template-shared-store/plan.md": {
+      "kind": "file",
+      "sha256": "4747e9680f58998601a7f467378947ba575fcff8dff90e952c1b6e73bf83d1e6"
+    },
+    "specs/011-report-template-shared-store/spec.md": {
+      "kind": "file",
+      "sha256": "46abd36189c0fc33b0b32657df1d918201f0b192644acc4c602f6212a7d8ef9c"
+    },
+    "specs/011-report-template-shared-store/tasks.md": {
+      "kind": "file",
+      "sha256": "72047493fb1f3fd42b97a85220baae13e6b43ea21bc8eda40a90682284037e97"
+    },
+    "specs/011-report-template-shared-store/verify.md": {
+      "kind": "file",
+      "sha256": "d29851d7558d0befd07c845e4eae4c61d56401a9bba4db8f8c5becd593dec1b4"
+    },
+    "specs/012-live-react-sql-result/evidence/live-gold-scorecard.json": {
+      "kind": "file",
+      "sha256": "e12dc1e319766e2e1164d9d002b2081f8a660ab34890c11e810d966a1523d4f7"
+    },
+    "specs/012-live-react-sql-result/plan.md": {
+      "kind": "file",
+      "sha256": "74645a29d1b9cfca82cde0ebb8d05d301eff04fd4e3475a0cfab2986c036bbea"
+    },
+    "specs/012-live-react-sql-result/scope-baseline-T001.json": {
+      "kind": "file",
+      "sha256": "ee076f62b9ad06aa2605c2a75e2864bc1ddfae66bd8e21d926d30efbc8a837c6"
+    },
+    "specs/012-live-react-sql-result/scope-baseline-T002.json": {
+      "kind": "file",
+      "sha256": "091dd358bc2b969b8b5f8b8b2a6d5cfac9cf2f01aebcb8b4bfad00adebe14fd5"
+    },
+    "specs/012-live-react-sql-result/scope-report-T001.json": {
+      "kind": "file",
+      "sha256": "429dd0f80151828dc8e6014cf7af83489a9d0c55ac5d87d057646a70925d96d4"
+    },
+    "specs/012-live-react-sql-result/scope-report-T002.json": {
+      "kind": "file",
+      "sha256": "3b0d5c38d36163a09283b21dde48a1a962d96891baae4f4a96bc4ec249087da7"
+    },
+    "specs/012-live-react-sql-result/spec.md": {
+      "kind": "file",
+      "sha256": "0fdd4eb98588f40180642190e88ac18b129543d600b45b5cff65b2c722938892"
+    },
+    "specs/012-live-react-sql-result/state.json": {
+      "kind": "file",
+      "sha256": "02e4371d5cc549a8218c7e647edbe6fae2e81e4e34c4d20d28848006e32434ee"
+    },
+    "specs/012-live-react-sql-result/tasks.md": {
+      "kind": "file",
+      "sha256": "bced36ea83c1f7e81e72b89fe11ff4e15dae1ca8e495366d2fbae6942cad6c39"
+    },
+    "specs/012-live-react-sql-result/verify.md": {
+      "kind": "file",
+      "sha256": "f3633f9199d22b4cb4ca8df262725ac4a273906186b79bec2bc92a2986589d9c"
+    },
+    "specs/013-local-agent-model/plan.md": {
+      "kind": "file",
+      "sha256": "cca6c6123dc29c8de110d8e2d320f2acfccec2e90ab1176147e9bb584505584a"
+    },
+    "specs/013-local-agent-model/run_q01_repeats.py": {
+      "kind": "file",
+      "sha256": "2cc171889e89e6fea25ceaef47a7c72cd380bbc600515b5a110809e30f424408"
+    },
+    "specs/013-local-agent-model/scope-baseline-T001.json": {
+      "kind": "file",
+      "sha256": "e227c118792290ff374f13ae4810f4835970eeda7bd31ba1636590f7cadbdbd4"
+    },
+    "specs/013-local-agent-model/scope-baseline-T002.json": {
+      "kind": "file",
+      "sha256": "0665d2f97bcc2050fadff98d5713c1a213bae187303e141dd428788b9dbd6370"
+    },
+    "specs/013-local-agent-model/scope-report-T001.json": {
+      "kind": "file",
+      "sha256": "d4f0b871b0f5f75df4170387a3700ee8ae63683cca30d05ab27290a0d4908711"
+    },
+    "specs/013-local-agent-model/spec.md": {
+      "kind": "file",
+      "sha256": "fb54b7e345434833edb27f6a32496aec4ee9caeb9706ec176c29e4505ab384d9"
+    },
+    "specs/013-local-agent-model/state.json": {
+      "kind": "file",
+      "sha256": "dc79e17a4616850151b98490efbf38972b5899c10771de58a711ef7e2a2461eb"
+    },
+    "specs/013-local-agent-model/tasks.md": {
+      "kind": "file",
+      "sha256": "cac0c643979f5349bee3fc98ab66a6cda7875b6c158b1376babb6c92d392ddc0"
+    },
+    "specs/014-database-react-prompt/evidence/q01-scorecard.json": {
+      "kind": "file",
+      "sha256": "735b33faf8869e846151a83891df776a880121509b9d95effd55954f0089a484"
+    },
+    "specs/014-database-react-prompt/evidence/q01.json": {
+      "kind": "file",
+      "sha256": "7325e34cf4a33b7cc06e6af8b97a1301095e52557ed9962137dc01c9e9846f90"
+    },
+    "specs/014-database-react-prompt/plan.md": {
+      "kind": "file",
+      "sha256": "8bb74fea89fe54c16acbd7b7323b0d2a8c9428e4ca6ecaac5cb70a24f167d79b"
+    },
+    "specs/014-database-react-prompt/scope-baseline-T001.json": {
+      "kind": "file",
+      "sha256": "7b96c1658474d186de4e67f8d621be2cfaddb9e1a52ff6c767ef9cd036a7a7ea"
+    },
+    "specs/014-database-react-prompt/scope-baseline-T002.json": {
+      "kind": "file",
+      "sha256": "41d60ff26eaa699d0639dad0efcfb6e3b2124b59ac444df70f7d65b7ecaed18a"
+    },
+    "specs/014-database-react-prompt/scope-report-T001.json": {
+      "kind": "file",
+      "sha256": "82cbf17f6ebb1cb1b4071c0d481f3b13aa353bb6b5bf0636702801bb76ecdae4"
+    },
+    "specs/014-database-react-prompt/spec.md": {
+      "kind": "file",
+      "sha256": "cf1dc0d891c8a25052bdbfa960df8f740f6adf688dbe5936352dd71101efee2f"
+    },
+    "specs/014-database-react-prompt/state.json": {
+      "kind": "file",
+      "sha256": "22784098d645858cf707f9390308197cf3fae6247b1e2610f12f64f20558115c"
+    },
+    "specs/014-database-react-prompt/tasks.md": {
+      "kind": "file",
+      "sha256": "129a0b1bd4fe30b7fcc4eec49ef2628f0d027f3d9750eb59a21f7f011c26effa"
+    },
+    "specs/015-database-react-turn-format/plan.md": {
+      "kind": "file",
+      "sha256": "df4ecffc11c0fc7d21d6179cd7f746aceebb50234111822250f4fd7884f39899"
+    },
+    "specs/015-database-react-turn-format/scope-baseline-T001.json": {
+      "kind": "file",
+      "sha256": "2210b6bfd1b32bab7f94679d1ebf639869f85fd1bd3daf0115fb8e71eba6b584"
+    },
+    "specs/015-database-react-turn-format/scope-report-T001.json": {
+      "kind": "file",
+      "sha256": "242b8e568ee6c2a37c379b45743d821415aa364b5e7baaa641761adbe6653165"
+    },
+    "specs/015-database-react-turn-format/spec.md": {
+      "kind": "file",
+      "sha256": "78e12e54ed4c4affcd81d53492af182339b71c3fa55c0381cdb1aeeda93aba35"
+    },
+    "specs/015-database-react-turn-format/state.json": {
+      "kind": "file",
+      "sha256": "511d7f9f9b55f905b5017921674b73628d58d9b4b089b7cf825edea227ecf83f"
+    },
+    "specs/015-database-react-turn-format/tasks.md": {
+      "kind": "file",
+      "sha256": "6f0b6034a9243613eee542be4605ba9fb3de4ad405cbf4ac67fa67f701f38e57"
+    },
+    "specs/016-local-model-default/evidence/q01-scorecard.json": {
+      "kind": "file",
+      "sha256": "735b33faf8869e846151a83891df776a880121509b9d95effd55954f0089a484"
+    },
+    "specs/016-local-model-default/plan.md": {
+      "kind": "file",
+      "sha256": "d6caf4971fae70f4051bef3cdba3524d96f4b88345d0cfe1cbdd9bd1d9584eef"
+    },
+    "specs/016-local-model-default/scope-baseline-T001.json": {
+      "kind": "file",
+      "sha256": "b326dfc8b3637ee6c783542a41e4c9b882d63832c7abc3a01a037ff0ee1baabf"
+    },
+    "specs/016-local-model-default/scope-baseline-T002.json": {
+      "kind": "file",
+      "sha256": "c12e2eb860e4b7fe6a12d4c09d0a22b4a85cd1242c2b70c5fb0a759393e51162"
+    },
+    "specs/016-local-model-default/scope-report-T001.json": {
+      "kind": "file",
+      "sha256": "81986f6a4506054e9456cf4d84128744cddd0d33511fbb7a017528c046df33b1"
+    },
+    "specs/016-local-model-default/spec.md": {
+      "kind": "file",
+      "sha256": "7c13dee1d749edcf8c8eef5c5cac2b25b21a666637dd18619ac7d710ecc54b41"
+    },
+    "specs/016-local-model-default/state.json": {
+      "kind": "file",
+      "sha256": "aeca7c7f9e24f7f29e162736a2bbc934de6c5287c96e2f267d96fbd9cfec51f3"
+    },
+    "specs/016-local-model-default/tasks.md": {
+      "kind": "file",
+      "sha256": "fd1290c178d804da9049c4400e1d99dda35ad977e4bf53970c077101279bdbdd"
+    },
+    "specs/README.md": {
+      "kind": "file",
+      "sha256": "1ebf37a32c86cf8a7fd8327ce6936a0177082a444fd2ed3030abccc2541c4dfc"
+    },
+    "tools/migrate_datasource_credentials.py": {
+      "kind": "file",
+      "sha256": "35c4a9c959546f1e767ed79766f0cf9a1d80142b023db39f7dbd69e55d1868fe"
+    },
+    "uv.lock": {
+      "kind": "file",
+      "sha256": "4c725dffd6e2bd107398c5eebb4551982022241a401ee13c4df4fa6d206dc170"
+    }
+  },
+  "internal_patterns": [
+    "specs/017-published-metric-agent-routing/**",
+    "specs/017-published-metric-agent-routing/scope-baseline-T001.json"
+  ]
+}

@@ -126,8 +126,10 @@ class CustomBuildHook(BuildHookInterface):
                 if os.path.exists(source):
                     force_include[source] = wheel_target
         else:
-            # Standard build from sdist: files sit at sdist-relative
-            # paths set by pyproject.toml [tool.hatch.build.targets.sdist]
+            # Standard builds may run from either an extracted sdist or a
+            # source checkout. Prefer remapped sdist paths, then fall back to
+            # the repository source paths for direct wheel builds.
+            repo_root = pkg_root.parent.parent
             for repo_rel, wheel_target in all_mappings.items():
                 sdist_path = repo_rel
                 for prefix, replacement in _SDIST_REMAP.items():
@@ -135,6 +137,10 @@ class CustomBuildHook(BuildHookInterface):
                         sdist_path = replacement + repo_rel[len(prefix) :]
                         break
                 source = str(pkg_root / sdist_path)
+                if not os.path.exists(source):
+                    source = str(pkg_root / wheel_target)
+                if not os.path.exists(source):
+                    source = str(repo_root / repo_rel)
                 if os.path.exists(source):
                     force_include[source] = wheel_target
 

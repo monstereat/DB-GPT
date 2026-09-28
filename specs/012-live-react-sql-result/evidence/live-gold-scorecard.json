@@ -1,0 +1,396 @@
+{
+  "question_count": 50,
+  "correct": 0,
+  "incorrect": 30,
+  "missing_result": 20,
+  "invalid_result": 0,
+  "truncated": 0,
+  "result_accuracy": 0.0,
+  "by_category": {
+    "customer_analysis": {
+      "question_count": 4,
+      "correct": 0,
+      "incorrect": 2,
+      "missing_result": 2,
+      "invalid_result": 0,
+      "truncated": 0,
+      "accuracy": 0.0
+    },
+    "multiturn_analysis": {
+      "question_count": 3,
+      "correct": 0,
+      "incorrect": 1,
+      "missing_result": 2,
+      "invalid_result": 0,
+      "truncated": 0,
+      "accuracy": 0.0
+    },
+    "order_amount_analysis": {
+      "question_count": 3,
+      "correct": 0,
+      "incorrect": 3,
+      "missing_result": 0,
+      "invalid_result": 0,
+      "truncated": 0,
+      "accuracy": 0.0
+    },
+    "order_counts": {
+      "question_count": 3,
+      "correct": 0,
+      "incorrect": 3,
+      "missing_result": 0,
+      "invalid_result": 0,
+      "truncated": 0,
+      "accuracy": 0.0
+    },
+    "product_analysis": {
+      "question_count": 9,
+      "correct": 0,
+      "incorrect": 3,
+      "missing_result": 6,
+      "invalid_result": 0,
+      "truncated": 0,
+      "accuracy": 0.0
+    },
+    "refunds": {
+      "question_count": 8,
+      "correct": 0,
+      "incorrect": 5,
+      "missing_result": 3,
+      "invalid_result": 0,
+      "truncated": 0,
+      "accuracy": 0.0
+    },
+    "regional_sales": {
+      "question_count": 10,
+      "correct": 0,
+      "incorrect": 4,
+      "missing_result": 6,
+      "invalid_result": 0,
+      "truncated": 0,
+      "accuracy": 0.0
+    },
+    "sales_aggregates": {
+      "question_count": 3,
+      "correct": 0,
+      "incorrect": 3,
+      "missing_result": 0,
+      "invalid_result": 0,
+      "truncated": 0,
+      "accuracy": 0.0
+    },
+    "time_series": {
+      "question_count": 7,
+      "correct": 0,
+      "incorrect": 6,
+      "missing_result": 1,
+      "invalid_result": 0,
+      "truncated": 0,
+      "accuracy": 0.0
+    }
+  },
+  "macro_average_accuracy": 0.0,
+  "cases": [
+    {
+      "question_id": "q01",
+      "category": "regional_sales",
+      "status": "missing_result",
+      "result_sha256": null
+    },
+    {
+      "question_id": "q02",
+      "category": "refunds",
+      "status": "missing_result",
+      "result_sha256": null
+    },
+    {
+      "question_id": "q03",
+      "category": "order_counts",
+      "status": "incorrect",
+      "result_sha256": "2d94f15fbb021ddcf426dbedce677945e11ba542d35e371bc9469f33177bfe45"
+    },
+    {
+      "question_id": "q04",
+      "category": "order_counts",
+      "status": "incorrect",
+      "result_sha256": "2d94f15fbb021ddcf426dbedce677945e11ba542d35e371bc9469f33177bfe45"
+    },
+    {
+      "question_id": "q05",
+      "category": "sales_aggregates",
+      "status": "incorrect",
+      "result_sha256": "e3d13927beeca4c8ac542a03d184e1fcf285175def1a712d8826c937d10833d7"
+    },
+    {
+      "question_id": "q06",
+      "category": "refunds",
+      "status": "incorrect",
+      "result_sha256": "f2459969eaeb61306fadf2a6df2e4de492d21a21f77834a636242ee206c096a8"
+    },
+    {
+      "question_id": "q07",
+      "category": "sales_aggregates",
+      "status": "incorrect",
+      "result_sha256": "50df5a53066e12ac81ff873242314c394f043c2684ab68d0146ffa292d4773bb"
+    },
+    {
+      "question_id": "q08",
+      "category": "sales_aggregates",
+      "status": "incorrect",
+      "result_sha256": "142a143c29324a40960be80e805464e379c17644c176e11d45d83c324a088da6"
+    },
+    {
+      "question_id": "q09",
+      "category": "time_series",
+      "status": "missing_result",
+      "result_sha256": null
+    },
+    {
+      "question_id": "q10",
+      "category": "regional_sales",
+      "status": "missing_result",
+      "result_sha256": null
+    },
+    {
+      "question_id": "q11",
+      "category": "product_analysis",
+      "status": "missing_result",
+      "result_sha256": null
+    },
+    {
+      "question_id": "q12",
+      "category": "product_analysis",
+      "status": "incorrect",
+      "result_sha256": "d63b2dc9abb516b123da0fe8325cd1d8e4c9f4916398f82f2a9433fe11c1bf1c"
+    },
+    {
+      "question_id": "q13",
+      "category": "product_analysis",
+      "status": "missing_result",
+      "result_sha256": null
+    },
+    {
+      "question_id": "q14",
+      "category": "refunds",
+      "status": "missing_result",
+      "result_sha256": null
+    },
+    {
+      "question_id": "q15",
+      "category": "refunds",
+      "status": "missing_result",
+      "result_sha256": null
+    },
+    {
+      "question_id": "q16",
+      "category": "customer_analysis",
+      "status": "incorrect",
+      "result_sha256": "51bb879dd3f8319d14a516036d40251fc1dee2c5b273d685bf420cf05a6644b2"
+    },
+    {
+      "question_id": "q17",
+      "category": "regional_sales",
+      "status": "incorrect",
+      "result_sha256": "6fd6c2e5edd3d36f75641c23887a2a98fdde34ab6a67cda296196612e0af70e3"
+    },
+    {
+      "question_id": "q18",
+      "category": "regional_sales",
+      "status": "incorrect",
+      "result_sha256": "04ae03e12fc52cd9247f68a24faa3426db36e40b391a9750bbb620efee0621c6"
+    },
+    {
+      "question_id": "q19",
+      "category": "time_series",
+      "status": "incorrect",
+      "result_sha256": "2d94f15fbb021ddcf426dbedce677945e11ba542d35e371bc9469f33177bfe45"
+    },
+    {
+      "question_id": "q20",
+      "category": "time_series",
+      "status": "incorrect",
+      "result_sha256": "77dc0b41daa333ed94e2ce946c9f944433a865cc92df49ca0d1f698007cf2e07"
+    },
+    {
+      "question_id": "q21",
+      "category": "time_series",
+      "status": "incorrect",
+      "result_sha256": "77dc0b41daa333ed94e2ce946c9f944433a865cc92df49ca0d1f698007cf2e07"
+    },
+    {
+      "question_id": "q22",
+      "category": "product_analysis",
+      "status": "missing_result",
+      "result_sha256": null
+    },
+    {
+      "question_id": "q23",
+      "category": "product_analysis",
+      "status": "missing_result",
+      "result_sha256": null
+    },
+    {
+      "question_id": "q24",
+      "category": "time_series",
+      "status": "incorrect",
+      "result_sha256": "f0446bef36551f34ce4d3975c7bda464b62c943e19bbffd0637b7fef70945410"
+    },
+    {
+      "question_id": "q25",
+      "category": "order_amount_analysis",
+      "status": "incorrect",
+      "result_sha256": "d658bb93b8f2ed229ea068fef74dce6cf401ef4c295285e21a4578f218411761"
+    },
+    {
+      "question_id": "q26",
+      "category": "order_amount_analysis",
+      "status": "incorrect",
+      "result_sha256": "453ec423544f0a3714f310d67d41d360114178475072e312a8cab7c4086144b9"
+    },
+    {
+      "question_id": "q27",
+      "category": "refunds",
+      "status": "incorrect",
+      "result_sha256": "0a1a4dacae413995598145d8212b5cb93fea685016fe832e3b1647eaf0cf8eee"
+    },
+    {
+      "question_id": "q28",
+      "category": "time_series",
+      "status": "incorrect",
+      "result_sha256": "e3d13927beeca4c8ac542a03d184e1fcf285175def1a712d8826c937d10833d7"
+    },
+    {
+      "question_id": "q29",
+      "category": "regional_sales",
+      "status": "incorrect",
+      "result_sha256": "0fcbba20d3fdcc70673cc3c5d062cda79a0d0816860b431955c84c8415cdfc7c"
+    },
+    {
+      "question_id": "q30",
+      "category": "refunds",
+      "status": "incorrect",
+      "result_sha256": "2db148396ee706a03c602211e94a8aafed569cfc275431c829ca0b69ac5273e5"
+    },
+    {
+      "question_id": "q31",
+      "category": "regional_sales",
+      "status": "missing_result",
+      "result_sha256": null
+    },
+    {
+      "question_id": "q32",
+      "category": "product_analysis",
+      "status": "missing_result",
+      "result_sha256": null
+    },
+    {
+      "question_id": "q33",
+      "category": "product_analysis",
+      "status": "incorrect",
+      "result_sha256": "83667eeaa52c7d83bd36fcfb5a91b0d3dd3b2f73d2393209a74232b6ea420d95"
+    },
+    {
+      "question_id": "q34",
+      "category": "refunds",
+      "status": "incorrect",
+      "result_sha256": "bb8cbd0b27a7d7707a09f6d80724ed0ba4531aa613849e52c4c69dd1f602a87a"
+    },
+    {
+      "question_id": "q35",
+      "category": "regional_sales",
+      "status": "missing_result",
+      "result_sha256": null
+    },
+    {
+      "question_id": "q36",
+      "category": "regional_sales",
+      "status": "missing_result",
+      "result_sha256": null
+    },
+    {
+      "question_id": "q37",
+      "category": "time_series",
+      "status": "incorrect",
+      "result_sha256": "faa5baa0ffa4ad465dbd7dc19421e1c46ce66a130fdc18c286c10cd95097df5c"
+    },
+    {
+      "question_id": "q38",
+      "category": "refunds",
+      "status": "incorrect",
+      "result_sha256": "0832a168879074cdfc0d060c54485400c3a1722bb14511cc50e055a63bbdfb80"
+    },
+    {
+      "question_id": "q39",
+      "category": "order_amount_analysis",
+      "status": "incorrect",
+      "result_sha256": "03b87da6260e53ab6b0d111771188d54fdb13b70804a882a7cc20cd907421515"
+    },
+    {
+      "question_id": "q40",
+      "category": "customer_analysis",
+      "status": "incorrect",
+      "result_sha256": "51bb879dd3f8319d14a516036d40251fc1dee2c5b273d685bf420cf05a6644b2"
+    },
+    {
+      "question_id": "q41",
+      "category": "regional_sales",
+      "status": "missing_result",
+      "result_sha256": null
+    },
+    {
+      "question_id": "q42",
+      "category": "multiturn_analysis",
+      "status": "missing_result",
+      "result_sha256": null
+    },
+    {
+      "question_id": "q43",
+      "category": "multiturn_analysis",
+      "status": "missing_result",
+      "result_sha256": null
+    },
+    {
+      "question_id": "q44",
+      "category": "multiturn_analysis",
+      "status": "incorrect",
+      "result_sha256": "d67d4f1e77ebf79c7705dc617ba30c7369623e736e35c722344feb992ed6e87d"
+    },
+    {
+      "question_id": "q45",
+      "category": "customer_analysis",
+      "status": "missing_result",
+      "result_sha256": null
+    },
+    {
+      "question_id": "q46",
+      "category": "product_analysis",
+      "status": "incorrect",
+      "result_sha256": "9a993ed86a3b9939fe37d41379ddb6e5bd6d40505808574ed1d367085f27f1d8"
+    },
+    {
+      "question_id": "q47",
+      "category": "product_analysis",
+      "status": "missing_result",
+      "result_sha256": null
+    },
+    {
+      "question_id": "q48",
+      "category": "regional_sales",
+      "status": "incorrect",
+      "result_sha256": "8bf0169bbb19ec9c01ff69c196b6f1b9a6340884815613fa93e76d7af63a0ab1"
+    },
+    {
+      "question_id": "q49",
+      "category": "customer_analysis",
+      "status": "missing_result",
+      "result_sha256": null
+    },
+    {
+      "question_id": "q50",
+      "category": "order_counts",
+      "status": "incorrect",
+      "result_sha256": "477594468b7f8d6270ec2bb7aad0587c8f24e07ce896286550d7ab683c8fb896"
+    }
+  ],
+  "note": "Live DB-GPT ReAct structured SQL results compared with fixed synthetic gold answers; not a production authorization certification."
+}

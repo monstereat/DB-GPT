@@ -1,12 +1,19 @@
 import json
 import logging
 import os
+import time
 import uuid
 from typing import Dict, List, Type
 
 from dbgpt import SystemApp
+from dbgpt.datasource.sql_guard import (
+    SQLQueryFailure,
+    emit_agent_sql_audit,
+    sql_fingerprint,
+)
 from dbgpt.util.executor_utils import blocking_func_to_async
 from dbgpt.util.tracer import trace
+from dbgpt_app.openapi.api_v1.business_context import prepare_database_query
 from dbgpt_app.scene import BaseChat, ChatScene
 from dbgpt_app.scene.base_chat import ChatParam
 from dbgpt_app.scene.chat_dashboard.config import ChatDashboardConfig
@@ -45,6 +52,10 @@ class ChatDashboard(BaseChat):
         self.db_name = self.db_name
         self.report_name = "report"
         local_db_manager = ConnectorManager.get_instance(self.system_app)
+        if not local_db_manager.get_db_list(
+            db_name=self.db_name, user_id=chat_param.user_name
+        ):
+            raise PermissionError("Selected database is not available to this user")
         self.database = local_db_manager.get_connector(self.db_name)
         self.curr_config = chat_param.real_app_config(ChatDashboardConfig)
 
@@ -103,9 +114,28 @@ class ChatDashboard(BaseChat):
         chart_datas: List[ChartData] = []
         dashboard_data_loader = DashboardDataLoader()
         for chart_item in prompt_response:
+            started_at = time.monotonic()
+            audit_context = {}
             try:
+                audit_context = {
+                    "actor_user_id": self._chat_param.user_name,
+                    "data_source_id": self.db_name,
+                    "role": self._chat_param.user_role,
+                    "tenant_id": self._chat_param.tenant_id,
+                    "region_id": self._chat_param.region_id,
+                    "authorization_policy_version": "dashboard-sql-policy-v1",
+                    "trace_id": self.chat_session_id,
+                }
+                scoped_sql, audit_context = prepare_database_query(
+                    chart_item.sql, audit_context, self.database
+                )
                 field_names, values = dashboard_data_loader.get_chart_values_by_conn(
-                    self.database, chart_item.sql
+                    self.database,
+                    scoped_sql,
+                    audit_context=audit_context,
+                    verified_execution_context=(
+                        getattr(self._chat_param, "verified_execution_context", None)
+                    ),
                 )
                 chart_datas.append(
                     ChartData(
@@ -118,8 +148,21 @@ class ChatDashboard(BaseChat):
                         values=values,
                     )
                 )
-            except Exception as e:
-                logger.warning(f"Failed to get chart data: {str(e)}")
+            except Exception as error:
+                if not isinstance(error, SQLQueryFailure):
+                    emit_agent_sql_audit(
+                        audit_context,
+                        chart_item.sql,
+                        status="failed",
+                        category=type(error).__name__,
+                        duration_ms=round((time.monotonic() - started_at) * 1000),
+                        operation="dashboard.sql_query",
+                    )
+                logger.warning(
+                    "Failed to get chart data query_sha256=%s category=%s",
+                    sql_fingerprint(chart_item.sql),
+                    type(error).__name__,
+                )
         return ReportData(
             conv_uid=self.chat_session_id,
             template_name=self.report_name,

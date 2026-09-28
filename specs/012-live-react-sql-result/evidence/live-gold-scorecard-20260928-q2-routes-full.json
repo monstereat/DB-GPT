@@ -1,0 +1,6 @@
+{
+  "status": "stopped_by_scope",
+  "scorecard_generated": false,
+  "reason": "User narrowed verification to key-path testing; the full 50-question live run was stopped before completion.",
+  "note": "This is a run-status record, not a scorecard. Do not use it to infer overall accuracy."
+}

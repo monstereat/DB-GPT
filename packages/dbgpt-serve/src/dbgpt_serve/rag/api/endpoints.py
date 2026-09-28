@@ -26,6 +26,11 @@ from dbgpt_serve.rag.api.schemas import (
 )
 from dbgpt_serve.rag.config import SERVE_SERVICE_COMPONENT_NAME, ServeConfig
 from dbgpt_serve.rag.service.service import Service
+from dbgpt_serve.utils.token_quota import (
+    daily_token_quota_enabled,
+    knowledge_retrieval_may_call_llm,
+    reject_unmetered_model_call,
+)
 
 router = APIRouter()
 
@@ -224,6 +229,8 @@ async def space_retrieve(
     space = service.get(space_request)
     if not space:
         raise HTTPException(status_code=404, detail="Space not found")
+    if daily_token_quota_enabled() and knowledge_retrieval_may_call_llm(space):
+        reject_unmetered_model_call("LLM-backed knowledge retrieval")
     return Result.succ(await service.retrieve(request, space))
 
 

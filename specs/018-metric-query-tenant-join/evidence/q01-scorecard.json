@@ -1,0 +1,30 @@
+{
+  "question_count": 1,
+  "correct": 0,
+  "incorrect": 0,
+  "missing_result": 1,
+  "invalid_result": 0,
+  "truncated": 0,
+  "result_accuracy": 0.0,
+  "by_category": {
+    "regional_sales": {
+      "question_count": 1,
+      "correct": 0,
+      "incorrect": 0,
+      "missing_result": 1,
+      "invalid_result": 0,
+      "truncated": 0,
+      "accuracy": 0.0
+    }
+  },
+  "macro_average_accuracy": 0.0,
+  "cases": [
+    {
+      "question_id": "q01",
+      "category": "regional_sales",
+      "status": "missing_result",
+      "result_sha256": null
+    }
+  ],
+  "note": "Live Agent still emitted the unregistered sql_query action while only metric_query was available. Logs proved the static ReAct example still instructed Action: sql_query, causing repeated unavailable-tool calls; no successful result was returned."
+}

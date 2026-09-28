@@ -113,6 +113,10 @@ def _initialize_resource_manager(system_app: SystemApp):
     from dbgpt.agent.resource.manage import get_resource_manager, initialize_resource
     from dbgpt.agent.resource.skill_resource import SkillResource
     from dbgpt.agent.skill.manage import initialize_skill
+    from dbgpt_app.openapi.api_v1.business_context import (
+        authorize_agent_datasource_access,
+        prepare_agent_database_query,
+    )
     from dbgpt_serve.agent.resource.app import GptAppResource
     from dbgpt_serve.agent.resource.datasource import DatasourceResource
     from dbgpt_serve.agent.resource.knowledge import KnowledgeSpaceRetrieverResource
@@ -123,6 +127,9 @@ def _initialize_resource_manager(system_app: SystemApp):
     # Initialize skill manager
     initialize_skill(system_app)
     rm = get_resource_manager(system_app)
+    rm.set_database_execution_hooks(
+        authorize_agent_datasource_access, prepare_agent_database_query
+    )
     rm.register_resource(DatasourceResource)
     rm.register_resource(KnowledgeSpaceRetrieverResource)
     rm.register_resource(PluginToolPack, resource_type=ResourceType.Tool)

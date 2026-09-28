@@ -24,6 +24,7 @@ dependencies = [
     "typing_inspect",
     "tomli>=2.2.1",
     "apscheduler>=3.10,<4",
+    "sqlglot>=26.13.2,<27",
 ]
 
 [project.urls]

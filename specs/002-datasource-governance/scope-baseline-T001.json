@@ -1,0 +1,526 @@
+{
+  "schema_version": 2,
+  "base_commit": "93da908aa2ba936909a70d7b083ab6455f8a0a85",
+  "initial_snapshots": {
+    ".github/workflows/develop-me-sql-guard.yml": {
+      "kind": "file",
+      "sha256": "02b674ab289705801e1131e7367629e0b5a58e65511a2a9f917ce82d82d3cf15"
+    },
+    ".gitignore": {
+      "kind": "file",
+      "sha256": "a89fa081d3edcccc145e4611a0e3223a0d5bd8672f9f2d32d87e0a456fd345ba"
+    },
+    ".workbuddy/": {
+      "kind": "directory"
+    },
+    "assets/schema/dbgpt.sql": {
+      "kind": "file",
+      "sha256": "13317ae0ade212e7473eff296ba8c529cfbb76682bf97a75edc044a094ec566b"
+    },
+    "assets/schema/upgrade/v0_8_2/upgrade_to_v0.8.2.sql": {
+      "kind": "file",
+      "sha256": "9be53c5fec7916d923de598bb5b67624b10e2edcc8cee9fe7c9606e4dd75c7f9"
+    },
+    "assets/schema/upgrade/v0_8_2/v0.8.2.sql": {
+      "kind": "file",
+      "sha256": "f978cc6a4a59ffe9b062036c3fe8b017dfd5f00f4d22557eb378b36aafe93213"
+    },
+    "docs/develop-me-roadmap.md": {
+      "kind": "file",
+      "sha256": "6f648b93339a04dbafbce851ce2391df2051b18c1bc62800d2e7dc2b0de5dafc"
+    },
+    "examples/enterprise-text2sql/README.md": {
+      "kind": "file",
+      "sha256": "af760404b0ea87a32d990e8820a2c1d17d2de11dfc30ee8ddc59df03f5c97c55"
+    },
+    "examples/enterprise-text2sql/agent_multiturn_questions.json": {
+      "kind": "file",
+      "sha256": "753cc633b5288b8ed6d2946dddae716d406005cd4e0477b7867a2eb0d4f5c6f8"
+    },
+    "examples/enterprise-text2sql/agent_policy_cases.json": {
+      "kind": "file",
+      "sha256": "6096c9ee6a7998d6be12385d02c88325a5e4fc1123d73f41501a5771970e5ff0"
+    },
+    "examples/enterprise-text2sql/ambiguity_candidates.json": {
+      "kind": "file",
+      "sha256": "db5a45d692f8384c2146c9bbf21d73f33a0084516455597dfef73330c2d1e56c"
+    },
+    "examples/enterprise-text2sql/ambiguity_cases.json": {
+      "kind": "file",
+      "sha256": "7014ce77a75573fa9ab4752f5b1a3d3f351cea5f7bb7b25bbab9c77430b62080"
+    },
+    "examples/enterprise-text2sql/api.py": {
+      "kind": "file",
+      "sha256": "e15fcf2d6fe13512af26d02fa13aa4b99162bd8438ddc124e851b4607d9f5567"
+    },
+    "examples/enterprise-text2sql/business_dictionary.md": {
+      "kind": "file",
+      "sha256": "60d4582e815436716736c61d6603186da4f7f30615e8c74f18528a97746b65d0"
+    },
+    "examples/enterprise-text2sql/dialect_security_candidates.json": {
+      "kind": "file",
+      "sha256": "42e566dcd0b559162fbbf2d7cf3781a74f402b3c7fb42dab70321687b89c261e"
+    },
+    "examples/enterprise-text2sql/ecommerce_demo.py": {
+      "kind": "file",
+      "sha256": "f7b4dd4dea49553178767c332273fe96bde452026daa6edeb4268880a1162520"
+    },
+    "examples/enterprise-text2sql/evaluate_agent.py": {
+      "kind": "file",
+      "sha256": "fc1bf40a706f451b68747d8f6bf161b53e9ea5b259a95d65494b38b0cae69969"
+    },
+    "examples/enterprise-text2sql/evaluate_candidates.py": {
+      "kind": "file",
+      "sha256": "a40840d0f7edec7156b606e8e6da5397afc2f08d6a2bf2752b583db871ac82ba"
+    },
+    "examples/enterprise-text2sql/gold_candidates.json": {
+      "kind": "file",
+      "sha256": "a67c934170f7ca5232ea3a041abd470aeb699667ae2e2db2292b4db66ea2572e"
+    },
+    "examples/enterprise-text2sql/gold_questions.json": {
+      "kind": "file",
+      "sha256": "a5c4e60d48f1036f0a2aa647cc61796e74ae9fe46061d99b702ff039a7b5bd11"
+    },
+    "examples/enterprise-text2sql/guarded_query.py": {
+      "kind": "file",
+      "sha256": "563353a1e5b53f26ccb5d3f248eb457b50603ff9891f8110afcb1d76c939a9a5"
+    },
+    "examples/enterprise-text2sql/metric_cache.py": {
+      "kind": "file",
+      "sha256": "52be8419909f65e71c510a9679cb2c4dc265c25e43621fa53d8e7ba8f721e42b"
+    },
+    "examples/enterprise-text2sql/metric_candidates.json": {
+      "kind": "file",
+      "sha256": "ce70628accb7b0672d860e963d2a190fbdd65cf36847d5ab0b2a23aeccad5646"
+    },
+    "examples/enterprise-text2sql/metric_catalog.json": {
+      "kind": "file",
+      "sha256": "fb8f6d403f1ed876fcd96c0e577cca3fad285a7d1c9c87e526a8f52880d3186c"
+    },
+    "examples/enterprise-text2sql/metric_governance.py": {
+      "kind": "file",
+      "sha256": "75a111c20ed6681e8fc3ea4c425e97d71fa7844d7980bf7a85910b704e35104e"
+    },
+    "examples/enterprise-text2sql/migrate_report_results.py": {
+      "kind": "file",
+      "sha256": "fc79da5820b3ca34b1ff39f8892b916dc346afd2eeca21c22a92d15e2e69ef1f"
+    },
+    "examples/enterprise-text2sql/multiturn_authorization_candidates.json": {
+      "kind": "file",
+      "sha256": "d25d1bc6040db03b4003ece52b06a65b7a92ce4397b2069b305ea9cf1c355f9f"
+    },
+    "examples/enterprise-text2sql/multiturn_authorization_cases.json": {
+      "kind": "file",
+      "sha256": "55ce5eafa9ed20ce11cdcc7eb62dafc5cce27856be24da0f55ee2b5c1c94112e"
+    },
+    "examples/enterprise-text2sql/prune_report_tasks.py": {
+      "kind": "file",
+      "sha256": "daa9e64c4443b0598bf982028cdea4dc27d32a25a4ea67f2f40913d10f44f230"
+    },
+    "examples/enterprise-text2sql/report_tasks.py": {
+      "kind": "file",
+      "sha256": "f097d021ec350c64d2cd11d2052bd48f3a6a9488e3c191441c9e6d2926b509f6"
+    },
+    "examples/enterprise-text2sql/report_templates.json": {
+      "kind": "file",
+      "sha256": "10eef19a2410450e2a49d924d323c5049ef49f7af42eb6aa1cb473a745c0faca"
+    },
+    "examples/enterprise-text2sql/requirements-test.txt": {
+      "kind": "file",
+      "sha256": "f66167a026cb736de0071532c98a30e517cb7702fea2de19a07b94d08924ec8a"
+    },
+    "examples/enterprise-text2sql/row_scope_candidates.json": {
+      "kind": "file",
+      "sha256": "c86075c54c7de6e3717a968b29e50d335637b63cb2f42f38d0aa649a279b1bd8"
+    },
+    "examples/enterprise-text2sql/schema_metadata.json": {
+      "kind": "file",
+      "sha256": "323aa9bedb1a807d05ece2d240c1bdfeefb3c61bdc48c606ded033d5f65251f6"
+    },
+    "examples/enterprise-text2sql/schema_security_candidates.json": {
+      "kind": "file",
+      "sha256": "89a4422758a8b9f5e768a84a215a4c254dd5d8dd93d39aa6d5cd0bc09d70b074"
+    },
+    "examples/enterprise-text2sql/security_candidates.json": {
+      "kind": "file",
+      "sha256": "a13ac05c02667bf930b24f771e54fb46c0d907439b2969aa7cc92d30a1ccc10a"
+    },
+    "examples/enterprise-text2sql/semantic_metrics.py": {
+      "kind": "file",
+      "sha256": "18504d805eec8b0ceb2c37ee54e1aae09a286dc696d1538d1403fd4c55f9af2a"
+    },
+    "examples/enterprise-text2sql/test_api.py": {
+      "kind": "file",
+      "sha256": "7bd061b229f308738f97fa12695f91826b862559f5687c477ff3b567dff6f482"
+    },
+    "examples/enterprise-text2sql/test_ecommerce_demo.py": {
+      "kind": "file",
+      "sha256": "af2eeea07b705ecbbbfab769de9bab375283bf0beca123b9b857b4dbb379ae8e"
+    },
+    "examples/enterprise-text2sql/test_evaluate_agent.py": {
+      "kind": "file",
+      "sha256": "173b684a519ef41472990a41865c21e5f4fc79497858ce77418f89c72e3e71b3"
+    },
+    "examples/enterprise-text2sql/test_evaluate_candidates.py": {
+      "kind": "file",
+      "sha256": "4efcdd4b8e6a768af35731800a677d1e9affa78fe1788283d07a76f9c329634a"
+    },
+    "examples/enterprise-text2sql/test_guarded_query.py": {
+      "kind": "file",
+      "sha256": "f9885218f1329179d3bca53d410ed6a4d9153e77fbba311f9be8ce8bb427c049"
+    },
+    "examples/enterprise-text2sql/test_metric_cache.py": {
+      "kind": "file",
+      "sha256": "9cbba820ce862c0348aa09d352252125b40166d8d9362c17049d4162466e93cd"
+    },
+    "examples/enterprise-text2sql/test_metric_governance.py": {
+      "kind": "file",
+      "sha256": "659934d708e8b324e825aea04f46975e1d3b9fe6bdabb4fe09beec37d57d37d3"
+    },
+    "examples/enterprise-text2sql/test_report_tasks.py": {
+      "kind": "file",
+      "sha256": "b447bdbc57e514c5930bc83d8886b81765a1bb85c49ba46b8f50a8881d462a2b"
+    },
+    "examples/enterprise-text2sql/test_semantic_metrics.py": {
+      "kind": "file",
+      "sha256": "a40d7d0ee846c77fbe7a6e491f9bf9544f918a5886aee027d8eb4be84da2bf58"
+    },
+    "examples/enterprise-text2sql/ui/": {
+      "kind": "directory"
+    },
+    "packages/dbgpt-app/hatch_build.py": {
+      "kind": "file",
+      "sha256": "a2a8b5ddc85befd1484384e911c5eec57f483142e8e1f072be06b754a28ba86d"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/component_configs.py": {
+      "kind": "file",
+      "sha256": "3cb7467378f26a0917e5324b7661e170681b72661967eb510787df9c7b7dab63"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/initialization/db_model_initialization.py": {
+      "kind": "file",
+      "sha256": "5cd1762088933e4b5fe4a375152ab7db260caaae397fb0c4a955573df5848147"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/initialization/workspace_provisioning.py": {
+      "kind": "file",
+      "sha256": "ebb7903ee9671d6862e20686d4342c37496a5b289092dace52324cf0daa4b81e"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/agentic_data_api.py": {
+      "kind": "file",
+      "sha256": "10318980536c7684e2bcbfe972a8558e2a8f593357c94f87b92949da19b8614e"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/api_v1.py": {
+      "kind": "file",
+      "sha256": "3d8806a95e796ee4509bdd877d15b2418186b6f0adfd4aa28cdc274a24b3d48e"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/business_context.py": {
+      "kind": "file",
+      "sha256": "d8fce261c50158c9a3d61914ad626001cd0f6a065bc1a30b39435f9be6f5b04a"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/editor/api_editor_v1.py": {
+      "kind": "file",
+      "sha256": "27ac1381120f9685678b492a24f5ca6ebca8f368d10013bce04046f1834a6c2f"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/editor/service.py": {
+      "kind": "file",
+      "sha256": "ac480e289bf1e147df2808baf04756eba59b1ca22f2c1c5b6a257068983e7830"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/editor/tests/test_chart_run.py": {
+      "kind": "file",
+      "sha256": "dca15656db8d1b15c2c40f2c41035a8e08c6e46ae4c5bfbbf1ef999ef3466352"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/sql_result_events.py": {
+      "kind": "file",
+      "sha256": "4840326a588beeb93eea9eb595a2b8838e3de8c1617843b7c1bfb99a2311fadc"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/subagent/dispatcher.py": {
+      "kind": "file",
+      "sha256": "64f7f59e39bd5dde739907bd986782e152fe8a3067e0256c50efb3cc20cc4105"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/subagent/react_tools.py": {
+      "kind": "file",
+      "sha256": "244ed695c326a33f0cc3c1dd9da3128a52abe2e2ae862f16a6fa4016c1c8de15"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/subagent/tests/test_dispatch_tool.py": {
+      "kind": "file",
+      "sha256": "eb6a4bff00629a24cca741050fcb746957c54a5282409c161d23c1c4f86c86e8"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/subagent/tests/test_dispatcher.py": {
+      "kind": "file",
+      "sha256": "130b374835506f0774336d6d378cb0e7755aa61be0a2be312a997fc2443c5928"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/subagent/tests/test_react_tools.py": {
+      "kind": "file",
+      "sha256": "9e9762fc91f69962f2db87acae28dcb3d231b6765ece1de93c3f4f34c50869f7"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tests/test_agentic_data_api_lifecycle.py": {
+      "kind": "file",
+      "sha256": "fb6d1adc5c966aac74f1a811f3128410f42fa5e01f8672617b0cacb75f2360d1"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tests/test_business_context.py": {
+      "kind": "file",
+      "sha256": "a793fc7cd7f8bf71dd2f3716496d74a87ca66dfcc373a18a14636cf418f85bad"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tests/test_datasource_api_redaction.py": {
+      "kind": "file",
+      "sha256": "8f7444c8659fa22bd15180ac95d2be5fff29acf23b10aae497f88e6f64f3aac2"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tests/test_sql_result_events.py": {
+      "kind": "file",
+      "sha256": "15a152e802ca15438180889df9298c78a507c0a45b1e0266eee3d2fc93c20e6f"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tests/test_token_quota.py": {
+      "kind": "file",
+      "sha256": "01356dfccfdf227be8553cfd54d968da7403c4093568fa7c532003ad8a970ea5"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/token_quota.py": {
+      "kind": "file",
+      "sha256": "20ad2533c40c81ebb54c616733044734afb6d81c59a4b44f11bb47ee7f79945d"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/__init__.py": {
+      "kind": "file",
+      "sha256": "bdb2db70f0c190ed0123e7c4d8ca0e453d5bc890362ebc020f3473b115beb052"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/code_interpreter.py": {
+      "kind": "file",
+      "sha256": "521070f1a259d41d45f84526dcbf4eea5b2c35825237c39139b4c9d770912259"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/execute_analysis.py": {
+      "kind": "file",
+      "sha256": "97c6f8efa6bc1be7ea4b78a3337d6d81f62a7378f46549e3fcde0da306e1739e"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/execute_tool.py": {
+      "kind": "file",
+      "sha256": "f161729a25d3f2e19eac5ef64e55f6f0fca1691526fb9d077e048bfaa51ff67d"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/html_interpreter.py": {
+      "kind": "file",
+      "sha256": "38bb7a88bca3691ac8a11a352c421ef560cab32abb6989eff6b25c1d7e932a9d"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/kb_tools.py": {
+      "kind": "file",
+      "sha256": "6ac000be626a19b44fe33f0e1c13bba5bbc0861119ac6c030deb857f3c48a4b2"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/knowledge_retrieve.py": {
+      "kind": "file",
+      "sha256": "c9d56cf59e9f796b54f4f5a65c3c5c498cdb599981292d000064f3731fffe52e"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/load_file.py": {
+      "kind": "file",
+      "sha256": "2e44a9cb724f13977bf370722bf5046df7f73b76af11f99e25ed3e13fbc87a73"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/load_tools.py": {
+      "kind": "file",
+      "sha256": "f93cf869b53055ae276a2c5ca7f4f6c7b6836984ae50920e8a1de71a7e44f29d"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/metric_catalog.py": {
+      "kind": "file",
+      "sha256": "1b71538d0dc32ae65c3bd445b15298d76e7a4f5b92cf7aead42b088e79e10ef6"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/metric_query.py": {
+      "kind": "file",
+      "sha256": "1801805159d5f34ff67f8a22845a691324df5ce44a67dd4019f938c1e875228a"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/question.py": {
+      "kind": "file",
+      "sha256": "e29f28712c4da1a8ba2875e43044db0216b287c45b9832aec242faa4366ce33d"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/read_file.py": {
+      "kind": "file",
+      "sha256": "252168667ce8784ef282f1ebc3e6064eb254fdcb8b63de276c275889c5e4170e"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/select_skill.py": {
+      "kind": "file",
+      "sha256": "d5db129c140c41a868e9f9f1b42f632f225387cbb1605d1077f5f3eada8a4840"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/shell_interpreter.py": {
+      "kind": "file",
+      "sha256": "4471994fd00ba432c9be33261766594616d5bcae9a3e25abeb1e776c304abf85"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/skill_tools.py": {
+      "kind": "file",
+      "sha256": "d8d0768902380876ef9f0c6b80f96474dd763dd1962b7c92e79773b4bdb40c93"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/sql_guard.py": {
+      "kind": "file",
+      "sha256": "f9496c69ac83c3cd95bf2ce453d28031e3537d5a89c939f5178f3dac3c0c5dd3"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/sql_query.py": {
+      "kind": "file",
+      "sha256": "22d38f76aa34f129766f34ea872bf945f691776e2d0c7861f64f36c7e32a860a"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/tests/test_session_file_tools.py": {
+      "kind": "file",
+      "sha256": "d7bfa4a72c0b51c15d322e4370df5edb24b97b284001ff97c4422582f5e46da5"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/tests/test_sql_guard.py": {
+      "kind": "file",
+      "sha256": "cdec07f4e8bdf9e105d062e55a7e65f54e3d0e0fe543d871aecb316abe8bd550"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/tests/test_sql_query.py": {
+      "kind": "file",
+      "sha256": "635a7e932bc498f11eb07bae7eb060e2a75005971098f7590c57da6b0aedce79"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/tests/test_tool_tracing.py": {
+      "kind": "file",
+      "sha256": "7233ed306d1d460778a990519fc431489d367bfe63958fec8490c26f1a15808a"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/todowrite.py": {
+      "kind": "file",
+      "sha256": "c20b8f584674b5138cff73377837bd9034436b06c9951d4634a434d504e73f89"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/tool_tracing.py": {
+      "kind": "file",
+      "sha256": "5978e1d24799fe5bcfb9638c7b264cc29f6e29511b3813bd6d5a6a47a5eeba26"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/scene/base_chat.py": {
+      "kind": "file",
+      "sha256": "30f5568d328338b75b2516626e7f0d2bdbd6a540134fff6db3eedbe7f4160d59"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/scene/chat_dashboard/chat.py": {
+      "kind": "file",
+      "sha256": "60b7e8af50cbaae3ad96dad481ff2c766bb1c4fe0a560088280124db6690fd74"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/scene/chat_dashboard/data_loader.py": {
+      "kind": "file",
+      "sha256": "ec90c70865f026f857f88db9376e2122265946be79fdc081b8bdbbcb13075a7b"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/scene/chat_dashboard/tests/": {
+      "kind": "directory"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/tests/test_agentic_multi_file_flow.py": {
+      "kind": "file",
+      "sha256": "e8c04303f4cab8fa671c989bd8e1598c3e56e49646515be4852614aaa021518d"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/tests/test_agentic_multi_file_security.py": {
+      "kind": "file",
+      "sha256": "9b3419b5c71680203f14704a1fd7852001cc4f8af6d9c150afc0cf0b92881ee3"
+    },
+    "packages/dbgpt-app/src/dbgpt_app/tests/test_attachment_react_adapter.py": {
+      "kind": "file",
+      "sha256": "af7ae3a6c08fa945fc8d6c9a200802110b3b76c494ac6faa8913226ca800f4b8"
+    },
+    "packages/dbgpt-core/pyproject.toml": {
+      "kind": "file",
+      "sha256": "50ed3f6dc503c456295e96718540a5b0dcf8b08ae3c822ad61bb50437bcc9501"
+    },
+    "packages/dbgpt-core/src/dbgpt/agent/resource/database.py": {
+      "kind": "file",
+      "sha256": "e4dd174db3fe66be18c563eafc0a015b7de92e7f5c2624576725c416ea505b15"
+    },
+    "packages/dbgpt-core/src/dbgpt/agent/resource/manage.py": {
+      "kind": "file",
+      "sha256": "5c563f0b8730b53ea2f10ed6bb2346010f2dc7452ac417d97c3b25a7831b7179"
+    },
+    "packages/dbgpt-core/src/dbgpt/agent/resource/tests/": {
+      "kind": "directory"
+    },
+    "packages/dbgpt-core/src/dbgpt/agent/resource/tool/pack.py": {
+      "kind": "file",
+      "sha256": "f5e6a0478a26758f3b11f1a2a445dbd38cdb8ecea16cbc0dde7911feb153b25b"
+    },
+    "packages/dbgpt-core/src/dbgpt/agent/resource/tool/tests/test_base_tool.py": {
+      "kind": "file",
+      "sha256": "797d515091b04bfed16c744e9161e0a05de9f070ba4f5240dcf2a0d0804e1bad"
+    },
+    "packages/dbgpt-core/src/dbgpt/datasource/rdbms/base.py": {
+      "kind": "file",
+      "sha256": "c10cb574d0bb0be08d9876ac72152bebc33d4ac946292a4aba2464070b425e96"
+    },
+    "packages/dbgpt-core/src/dbgpt/datasource/sql_guard.py": {
+      "kind": "file",
+      "sha256": "72749d7a6aaa943dc2acbdd7f75e1e56b26b05773c003c3020c23656647759ca"
+    },
+    "packages/dbgpt-core/src/dbgpt/datasource/tests/": {
+      "kind": "directory"
+    },
+    "packages/dbgpt-core/src/dbgpt/model/utils/provider_test.py": {
+      "kind": "file",
+      "sha256": "59e1797f9f9ddd87ef0680555b1f8362637db1dc644286f0bf5a3887ea8ee6b5"
+    },
+    "packages/dbgpt-core/src/dbgpt/util/tracer/tests/test_otlp_exporter.py": {
+      "kind": "file",
+      "sha256": "a270430e77203a0291a3dbd2a9c73e5eb33da61685137a47730fef4fcb66b457"
+    },
+    "packages/dbgpt-core/src/dbgpt/util/tracer/tests/test_tracer_impl.py": {
+      "kind": "file",
+      "sha256": "849b0222b1e04497c67a4d7fff596c8b61bcc0810415f8cad7e675e649b149ae"
+    },
+    "packages/dbgpt-core/src/dbgpt/util/tracer/tests/test_tracer_middleware.py": {
+      "kind": "file",
+      "sha256": "904d9170b1a32b87793fc3cb8317f253bf043bd61c6bd8d6bbd1893b8da3f4a4"
+    },
+    "packages/dbgpt-core/src/dbgpt/util/tracer/tracer_impl.py": {
+      "kind": "file",
+      "sha256": "9dad072283c6f9bbe72c54fc546e11d0a45471be277b48e076fbe977f995f35f"
+    },
+    "packages/dbgpt-core/src/dbgpt/util/tracer/tracer_middleware.py": {
+      "kind": "file",
+      "sha256": "ca38ff603e05909b8a3c0777cb489b445b288188cbb10e28cc442564629a0564"
+    },
+    "packages/dbgpt-ext/src/dbgpt_ext/datasource/conn_spark.py": {
+      "kind": "file",
+      "sha256": "70d177f09d6d3f64d743fbacec40bf5ec028effdd1f01dc2616b6911bd063d59"
+    },
+    "packages/dbgpt-ext/src/dbgpt_ext/datasource/rdbms/tests/test_conn_sqlite.py": {
+      "kind": "file",
+      "sha256": "aec18d7ebc93f19722390cea92eb1270144edf5fa09129549706a8b3b06299ad"
+    },
+    "packages/dbgpt-ext/tests/test_conn_spark.py": {
+      "kind": "file",
+      "sha256": "22569c6eb675a851e1a27f3292c0f2866cc9388f5de6e5c60dc106dbcc1af90d"
+    },
+    "packages/dbgpt-serve/pyproject.toml": {
+      "kind": "file",
+      "sha256": "e5826ae84df9bec407ad37121226fa869b57638a7ac2d0f55f4608ac5b03aa2a"
+    },
+    "packages/dbgpt-serve/src/dbgpt_serve/agent/agents/controller.py": {
+      "kind": "file",
+      "sha256": "37c44edab0daa15028d7eeb54cf84876fa38c94c297c53f36b6654c61c5ad1c9"
+    },
+    "packages/dbgpt-serve/src/dbgpt_serve/agent/resource/datasource.py": {
+      "kind": "file",
+      "sha256": "90d3f89adecf556ab8c02f0f31cd494e4d3888f1b1126141bffc23c0047ab904"
+    },
+    "packages/dbgpt-serve/src/dbgpt_serve/agent/resource/tests/": {
+      "kind": "directory"
+    },
+    "packages/dbgpt-serve/src/dbgpt_serve/datasource/api/schemas.py": {
+      "kind": "file",
+      "sha256": "321a9a8964e05fd8545a49bd716027eb5d0411bc2a6fb208164a90c5f0203de8"
+    },
+    "packages/dbgpt-serve/src/dbgpt_serve/datasource/manages/connect_config_db.py": {
+      "kind": "file",
+      "sha256": "c5f16aba4509a95b121c21ec8f699e132b368e13f205d451c8c701e5d8e4553d"
+    },
+    "packages/dbgpt-serve/src/dbgpt_serve/datasource/manages/connector_manager.py": {
+      "kind": "file",
+      "sha256": "39568d17c667c10d8fd771534d6274d1b446f61959016f2955de72636557d4ad"
+    },
+    "packages/dbgpt-serve/src/dbgpt_serve/datasource/service/service.py": {
+      "kind": "file",
+      "sha256": "6d94063bf22c7587a60b08de32a258a2e68f4fba215810fa6994109068659a10"
+    },
+    "packages/dbgpt-serve/src/dbgpt_serve/datasource/tests/test_connect_config_db.py": {
+      "kind": "file",
+      "sha256": "f24c4b2e22f0467c3b553c06c8793f8eb3cf87d807837a676decdd9ba2078d69"
+    },
+    "packages/dbgpt-serve/src/dbgpt_serve/token_quota/": {
+      "kind": "directory"
+    },
+    "packages/dbgpt-serve/src/dbgpt_serve/utils/auth.py": {
+      "kind": "file",
+      "sha256": "8854b927282a739b35fcf7a7dc2bf0f875c8b70041b9e32c8571b76f7d55abc6"
+    },
+    "packages/dbgpt-serve/src/dbgpt_serve/utils/tests/test_auth_execution_context.py": {
+      "kind": "file",
+      "sha256": "c2bc6d931bc66cf9b2abd7b13d01b5cc474f8db06065f83619ca1103d28a1355"
+    },
+    "specs/": {
+      "kind": "directory"
+    },
+    "uv.lock": {
+      "kind": "file",
+      "sha256": "5448a5ffb74118ed136fc04b4b100b9893e6c0ce611a6cefe8602ee4d5f40c70"
+    }
+  }
+}

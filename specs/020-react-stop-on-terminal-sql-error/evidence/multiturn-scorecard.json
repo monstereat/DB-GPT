@@ -1,0 +1,47 @@
+{
+  "question_count": 4,
+  "correct": 0,
+  "incorrect": 1,
+  "missing_result": 3,
+  "invalid_result": 0,
+  "truncated": 0,
+  "result_accuracy": 0.0,
+  "by_category": {
+    "multiturn_analysis": {
+      "question_count": 4,
+      "correct": 0,
+      "incorrect": 1,
+      "missing_result": 3,
+      "invalid_result": 0,
+      "truncated": 0,
+      "accuracy": 0.0
+    }
+  },
+  "cases": [
+    {
+      "question_id": "south_q2_context",
+      "category": "multiturn_analysis",
+      "status": "missing_result",
+      "result_sha256": null
+    },
+    {
+      "question_id": "south_q2_city_refund_followup",
+      "category": "multiturn_analysis",
+      "status": "missing_result",
+      "result_sha256": null
+    },
+    {
+      "question_id": "south_q2_context_sales_share",
+      "category": "multiturn_analysis",
+      "status": "missing_result",
+      "result_sha256": null
+    },
+    {
+      "question_id": "south_q2_guangzhou_sales_followup",
+      "category": "multiturn_analysis",
+      "status": "incorrect",
+      "result_sha256": "5299c1605d7bfe4ca77aefabeca3d5dfd8fd5b1379de289c7d9500df771e7c72"
+    }
+  ],
+  "note": "Local Ollama Agent with synthetic ecommerce-demo datasource. A non-retryable SQL error now ends the ReAct loop; this scorecard does not pass multi-turn understanding or certify production authorization."
+}

@@ -74,7 +74,7 @@ CREATE TABLE IF NOT EXISTS `connect_config`
     `db_host`  varchar(255) DEFAULT NULL COMMENT 'db connect host(not file db)',
     `db_port`  varchar(255) DEFAULT NULL COMMENT 'db cnnect port(not file db)',
     `db_user`  varchar(255) DEFAULT NULL COMMENT 'db user',
-    `db_pwd`   varchar(255) DEFAULT NULL COMMENT 'db password',
+    `db_pwd`   text DEFAULT NULL COMMENT 'encrypted db password',
     `comment`  text COMMENT 'db comment',
     `sys_code` varchar(128) DEFAULT NULL COMMENT 'System code',
     `user_name`  varchar(255) DEFAULT NULL COMMENT 'user name',
@@ -82,10 +82,27 @@ CREATE TABLE IF NOT EXISTS `connect_config`
     `gmt_created` datetime DEFAULT CURRENT_TIMESTAMP COMMENT 'Record creation time',
     `gmt_modified` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'Record update time',
     `ext_config` text COMMENT 'Extended configuration, json format',
+    `approval_status` varchar(32) NOT NULL DEFAULT 'pending' COMMENT 'Datasource approval state',
+    `submitted_by` varchar(128) DEFAULT NULL COMMENT 'Requesting user id',
+    `approved_by` varchar(128) DEFAULT NULL COMMENT 'Approving admin user id',
+    `approved_at` datetime DEFAULT NULL COMMENT 'Approval timestamp',
+    `approval_reason` text DEFAULT NULL COMMENT 'Approval decision reason',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_db` (`db_name`),
     KEY        `idx_q_db_type` (`db_type`)
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COMMENT 'Connection confi';
+
+CREATE TABLE IF NOT EXISTS `datasource_approval_audit`
+(
+    `id` int NOT NULL AUTO_INCREMENT,
+    `db_name` varchar(255) NOT NULL,
+    `actor_id` varchar(128) NOT NULL,
+    `decision` varchar(16) NOT NULL,
+    `reason` text DEFAULT NULL,
+    `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    KEY `idx_datasource_approval_audit_db_name` (`db_name`)
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COMMENT 'Datasource approval audit';
 
 CREATE TABLE IF NOT EXISTS `chat_history`
 (
@@ -666,6 +683,32 @@ CREATE TABLE IF NOT EXISTS `dbgpt_session_file` (
   KEY `idx_session_file_owner_task` (`owner_id`,`task_id`,`ordinal`),
   KEY `idx_session_file_sha256` (`owner_id`,`sha256`)
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Session file metadata table';
+
+-- dbgpt_token_quota_daily/reservation, per-tenant and per-user UTC daily token accounting
+CREATE TABLE IF NOT EXISTS `dbgpt_token_quota_daily` (
+  `tenant_id` varchar(255) NOT NULL COMMENT 'Trusted tenant identifier',
+  `user_id` varchar(255) NOT NULL COMMENT 'Trusted user identifier',
+  `quota_day_utc` date NOT NULL COMMENT 'UTC calendar day fixed when the reservation starts',
+  `used_tokens` bigint NOT NULL DEFAULT 0 COMMENT 'Settled prompt plus completion tokens',
+  `reserved_tokens` bigint NOT NULL DEFAULT 0 COMMENT 'Outstanding prompt plus completion token reservations',
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'Last accounting update time',
+  PRIMARY KEY (`tenant_id`,`user_id`,`quota_day_utc`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Daily token quota accounting in integer tokens';
+
+CREATE TABLE IF NOT EXISTS `dbgpt_token_quota_reservation` (
+  `reservation_id` varchar(64) NOT NULL COMMENT 'Idempotency key for one model-call reservation',
+  `tenant_id` varchar(255) NOT NULL COMMENT 'Trusted tenant identifier',
+  `user_id` varchar(255) NOT NULL COMMENT 'Trusted user identifier',
+  `quota_day_utc` date NOT NULL COMMENT 'UTC calendar day fixed when the reservation starts',
+  `reserved_tokens` bigint NOT NULL COMMENT 'Reserved prompt plus completion tokens',
+  `settled_tokens` bigint DEFAULT NULL COMMENT 'Measured prompt plus completion tokens',
+  `state` varchar(16) NOT NULL COMMENT 'pending / settled / released',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Reservation creation time',
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'Last reservation state change time',
+  PRIMARY KEY (`reservation_id`),
+  KEY `idx_token_quota_reservation_bucket` (`tenant_id`,`user_id`,`quota_day_utc`),
+  KEY `idx_token_quota_reservation_state_created` (`state`,`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Idempotent token quota reservations';
 
 -- code_graph_vertex, AST-extracted code nodes (classes, functions, modules, etc.)
 CREATE TABLE IF NOT EXISTS `code_graph_vertex` (

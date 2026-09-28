@@ -20,6 +20,8 @@ from typing import Annotated, Any, Dict
 
 from dbgpt.agent.resource.tool.base import tool
 
+from .tool_tracing import trace_agent_tool
+
 
 def _resolve_allowed_dirs(react_state: Dict[str, Any]) -> list:
     """Return the list of directories the read_file tool may read from."""
@@ -77,6 +79,7 @@ def make_read_file(react_state: Dict[str, Any]):
             '"limit": "max lines to read (optional, default 100)"}'
         ),
     )
+    @trace_agent_tool("agent.read_file")
     def read_file(
         file_path: Annotated[str, "Absolute path to the file to read"],
         offset: Annotated[int, "Start line number (0-based)"] = 0,

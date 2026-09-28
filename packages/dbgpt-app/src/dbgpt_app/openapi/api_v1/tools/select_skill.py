@@ -5,6 +5,8 @@ from typing import Any, Dict
 
 from dbgpt.agent.resource.tool.base import tool
 
+from .tool_tracing import trace_agent_tool
+
 
 def make_select_skill(react_state: Dict[str, Any], registry: Any):
     """Return a ``select_skill`` FunctionTool bound to the given react_state."""
@@ -13,6 +15,7 @@ def make_select_skill(react_state: Dict[str, Any], registry: Any):
         description="Select the most relevant skill based on user query from the "
         "available skills list in system prompt."
     )
+    @trace_agent_tool("agent.select_skill")
     def select_skill(query: str) -> str:
         def _is_excel_skill(meta) -> bool:
             name = (meta.name or "").lower()

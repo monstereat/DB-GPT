@@ -44,12 +44,14 @@ class ConnectorManager(BaseComponent):
         """Create a new ConnectorManager."""
         self.storage = ConnectConfigDao()
         self.system_app = system_app
+        self.storage.system_app = system_app
         self._db_summary_client: Optional["DBSummaryClient"] = None
 
         # Per-db_name cache of (created_at_unix_ts, connector_instance).
         # Lookups are cheap; we serialize them through ``_cache_lock`` to
         # avoid TOCTOU between get / set / pop.
         self._connector_cache: Dict[str, Tuple[float, BaseConnector]] = {}
+        self._connector_cache_key_fingerprints: Dict[str, Optional[str]] = {}
         self._connector_cache_lock = threading.Lock()
         # Per-db_name "creation" lock so that when many chats race for a
         # cold db_name only one of them runs the expensive reflection;
@@ -62,6 +64,7 @@ class ConnectorManager(BaseComponent):
     def init_app(self, system_app: SystemApp):
         """Init component."""
         self.system_app = system_app
+        self.storage.system_app = system_app
 
     def on_init(self):
         """Execute on init.
@@ -211,11 +214,29 @@ class ConnectorManager(BaseComponent):
         Args:
             db_name (str): database name
         """
+        db_config = self.storage.require_approved(db_name)
+        from dbgpt_serve.datasource.security import (
+            reveal_persisted_secrets,
+            validate_stored_secret_envelopes,
+        )
+
+        key_fingerprint = validate_stored_secret_envelopes(
+            db_config, db_config["db_type"], self
+        )
         now = time.time()
         with self._connector_cache_lock:
             cached = self._connector_cache.get(db_name)
-            if cached and now - cached[0] < self._connector_cache_ttl:
+            cached_key = self._connector_cache_key_fingerprints.get(db_name)
+            if (
+                cached
+                and now - cached[0] < self._connector_cache_ttl
+                and cached_key == key_fingerprint
+            ):
                 return cached[1]
+            stale_connector = self._connector_cache.pop(db_name, None)
+            self._connector_cache_key_fingerprints.pop(db_name, None)
+        if stale_connector:
+            self._dispose_connector(stale_connector[1])
 
         creation_lock = self._get_connector_creation_lock(db_name)
         with creation_lock:
@@ -223,12 +244,23 @@ class ConnectorManager(BaseComponent):
             # the cache while we were waiting for the creation lock.
             with self._connector_cache_lock:
                 cached = self._connector_cache.get(db_name)
-                if cached and time.time() - cached[0] < self._connector_cache_ttl:
+                cached_key = self._connector_cache_key_fingerprints.get(db_name)
+                if (
+                    cached
+                    and time.time() - cached[0] < self._connector_cache_ttl
+                    and cached_key == key_fingerprint
+                ):
                     return cached[1]
+                stale_connector = self._connector_cache.pop(db_name, None)
+                self._connector_cache_key_fingerprints.pop(db_name, None)
+            if stale_connector:
+                self._dispose_connector(stale_connector[1])
 
-            connector = self._build_connector(db_name)
+            db_config = reveal_persisted_secrets(db_config, db_config["db_type"], self)
+            connector = self._build_connector(db_name, db_config)
             with self._connector_cache_lock:
                 self._connector_cache[db_name] = (time.time(), connector)
+                self._connector_cache_key_fingerprints[db_name] = key_fingerprint
             return connector
 
     def invalidate_connector(self, db_name: str) -> None:
@@ -242,6 +274,7 @@ class ConnectorManager(BaseComponent):
         """
         with self._connector_cache_lock:
             cached = self._connector_cache.pop(db_name, None)
+            self._connector_cache_key_fingerprints.pop(db_name, None)
         if cached is not None:
             _, connector = cached
             self._dispose_connector(connector)
@@ -251,6 +284,7 @@ class ConnectorManager(BaseComponent):
         with self._connector_cache_lock:
             cache = self._connector_cache
             self._connector_cache = {}
+            self._connector_cache_key_fingerprints = {}
         for _, connector in cache.values():
             self._dispose_connector(connector)
 
@@ -277,14 +311,18 @@ class ConnectorManager(BaseComponent):
                     )
                 return
 
-    def _build_connector(self, db_name: str):
+    def _build_connector(self, db_name: str, db_config=None):
         """Construct a fresh connector for ``db_name`` (no cache).
 
         This is the original body of ``get_connector`` prior to caching;
         kept as a private helper so the public ``get_connector`` method
         can stay focused on cache logic.
         """
-        db_config = self.storage.get_db_config(db_name)
+        if db_config is None:
+            db_config = self.storage.require_approved(db_name)
+            from dbgpt_serve.datasource.security import reveal_persisted_secrets
+
+            db_config = reveal_persisted_secrets(db_config, db_config["db_type"], self)
 
         pwd = db_config["db_pwd"]
         if pwd:
@@ -401,8 +439,8 @@ class ConnectorManager(BaseComponent):
                     db_name=db_name,
                 )
         except Exception as e:
-            logger.error(f"{db_info.db_name} Test connect Failure!{str(e)}")
-            raise ValueError(f"{db_info.db_name} Test connect Failure!{str(e)}")
+            logger.error("Test connection failure (%s)", type(e).__name__)
+            raise ValueError("Test connection failed") from e
 
     def test_connection(self, request: DatasourceCreateRequest) -> bool:
         """Test connection.
@@ -422,8 +460,8 @@ class ConnectorManager(BaseComponent):
             _connector = self.create_connector(param)
             return True
         except Exception as e:
-            logger.error(f"Test connection Failure!{str(e)}")
-            raise ValueError(f"Test connection Failure!{str(e)}")
+            logger.error("Test connection failure (%s)", type(e).__name__)
+            raise ValueError("Test connection failed") from e
 
     def get_db_list(self, db_name: Optional[str] = None, user_id: Optional[str] = None):
         """Get db list."""
@@ -435,15 +473,17 @@ class ConnectorManager(BaseComponent):
     )
     def delete_db(self, db_name: str):
         """Delete db connect info."""
-        return self.storage.delete_db(db_name)
+        result = self.storage.delete_db(db_name)
+        self.invalidate_connector(db_name)
+        return result
 
     @Deprecated(
         version="0.7.0",
         remove_version="0.8.0",
     )
-    def edit_db(self, db_info: DBConfig):
+    def edit_db(self, db_info: DBConfig, updated_by: Optional[str] = None):
         """Edit db connect info."""
-        return self.storage.update_db_info(
+        result = self.storage.update_db_info(
             db_info.db_name,
             db_info.db_type,
             db_info.file_path,
@@ -452,7 +492,10 @@ class ConnectorManager(BaseComponent):
             db_info.db_user,
             db_info.db_pwd,
             db_info.comment,
+            updated_by=updated_by,
         )
+        self.invalidate_connector(db_info.db_name)
+        return result
 
     async def async_db_summary_embedding(self, db_name, db_type):
         """Async db summary embedding."""
@@ -472,7 +515,12 @@ class ConnectorManager(BaseComponent):
         Args:
             db_info (DBConfig): db connect info.
         """
-        logger.info(f"add_db:{db_info.__dict__}")
+        logger.info(
+            "Adding datasource db_name=%s db_type=%s owner=%s",
+            db_info.db_name,
+            db_info.db_type,
+            user_id,
+        )
         try:
             db_type = DBType.of_db_type(db_info.db_type)
             if not db_type:
@@ -496,16 +544,8 @@ class ConnectorManager(BaseComponent):
                     db_info.comment,
                     user_id,
                 )
-            # async embedding
-            executor = self.system_app.get_component(
-                ComponentType.EXECUTOR_DEFAULT, ExecutorFactory
-            ).create()  # type: ignore
-            executor.submit(
-                self.db_summary_client.db_summary_embedding,
-                db_info.db_name,
-                db_info.db_type,
-            )
         except Exception as e:
-            raise ValueError("Add db connect info error!" + str(e))
+            logger.error("Add datasource failed (%s)", type(e).__name__)
+            raise ValueError("Add db connect info error!") from None
 
         return True

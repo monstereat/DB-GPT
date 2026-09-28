@@ -3,11 +3,12 @@
 import dataclasses
 import logging
 from concurrent.futures import Executor, ThreadPoolExecutor
-from typing import Any, Dict, Generic, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Generic, List, Optional, Tuple, Union
 
 import cachetools
 
 from dbgpt.datasource.rdbms.base import RDBMSConnector
+from dbgpt.datasource.sql_guard import execute_read_only_query
 from dbgpt.util.cache_utils import cached
 from dbgpt.util.executor_utils import blocking_func_to_async
 
@@ -152,6 +153,8 @@ class RDBMSConnectorResource(DBResource[DBParameters]):
         db_type: Optional[str] = None,
         dialect: Optional[str] = None,
         executor: Optional[Executor] = None,
+        trusted_execution_context: Optional[Dict[str, Any]] = None,
+        query_policy: Optional[Callable] = None,
         **kwargs,
     ):
         """Initialize the connector resource."""
@@ -162,6 +165,8 @@ class RDBMSConnectorResource(DBResource[DBParameters]):
         if not db_name and connector:
             db_name = connector.get_current_db_name()
         self._connector = connector
+        self._trusted_execution_context = trusted_execution_context
+        self._query_policy = query_policy
         super().__init__(
             name,
             db_type=db_type,
@@ -188,10 +193,22 @@ class RDBMSConnectorResource(DBResource[DBParameters]):
 
     def _sync_query(self, db: str, sql: str) -> Tuple[Tuple, List]:
         """Return the query result."""
-        result_lst = self.connector.run(sql)
-        columns = result_lst[0]
-        values = result_lst[1:]
-        return columns, values
+        audit_context = {}
+        query_policy = getattr(self, "_query_policy", None)
+        if query_policy:
+            sql, audit_context = query_policy(
+                sql, getattr(self, "_trusted_execution_context", None), self.connector
+            )
+        result = execute_read_only_query(
+            self.connector,
+            sql,
+            audit_context=audit_context,
+            verified_execution_context=getattr(
+                self, "_trusted_execution_context", None
+            ),
+            span_name="agent.rdbms_resource_query",
+        )
+        return result.columns, result.rows
 
 
 class SQLiteDBResource(RDBMSConnectorResource):

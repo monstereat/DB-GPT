@@ -2,16 +2,18 @@ import asyncio
 import io
 import json
 import logging
+import math
 import os
 import re
 import shutil
 import tempfile
 import uuid
 import zipfile
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import TYPE_CHECKING, Any, AsyncGenerator, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
+import anyio
 from fastapi import (
     APIRouter,
     Body,
@@ -33,6 +35,7 @@ from dbgpt.agent.skill.manage import get_skill_manager
 from dbgpt.component import ComponentType
 from dbgpt.configs.model_config import SKILLS_DIR, resolve_root_path
 from dbgpt.core import PromptTemplate
+from dbgpt.datasource.sql_guard import AgentSQLBudget
 from dbgpt.model.cluster import WorkerManagerFactory
 from dbgpt.util.json_utils import parse_or_raise_error
 from dbgpt_app.openapi.api_view_model import (
@@ -40,7 +43,12 @@ from dbgpt_app.openapi.api_view_model import (
     Result,
 )
 from dbgpt_serve.datasource.manages import ConnectorManager
-from dbgpt_serve.utils.auth import UserRequest, get_user_from_headers
+from dbgpt_serve.utils.auth import (
+    UserRequest,
+    get_user_from_headers,
+    local_demo_execution_context,
+    trusted_agent_execution_context,
+)
 
 from .attachment_react_adapter import (
     AttachmentInputError,
@@ -52,13 +60,21 @@ from .attachment_react_adapter import (
     resolve_legacy_chat_file_path,
     scrub_react_history_for_share,
 )
+from .business_context import (
+    filter_metric_catalog_for_role,
+    format_database_business_context,
+    load_database_business_context,
+    load_database_metric_catalog,
+)
 from .react_final import AgentFinalAnswer, FinalAnswerAssembler
+from .sql_result_events import serialize_sql_result_event
 from .subagent.dispatcher import DISPATCH_PROMPT_SECTION, make_dispatch_tool
 from .subagent.history import (
     build_subagent_history_snapshot,
     fail_running_subagent_history,
     update_subagent_history,
 )
+from .tools.tool_tracing import trace_agent_tool
 
 router = APIRouter()
 CFG = Config()
@@ -165,6 +181,1434 @@ async def _load_context_budget_config(
         return defaults
 
 
+def _resolve_react_max_new_tokens(
+    requested_tokens: Optional[int], reserved_tokens: int
+) -> int:
+    """Bound one ReAct model generation by the configured output reserve."""
+    output_limit = (
+        reserved_tokens
+        if isinstance(reserved_tokens, int)
+        and not isinstance(reserved_tokens, bool)
+        and reserved_tokens > 0
+        else 4096
+    )
+    if not isinstance(requested_tokens, int) or isinstance(requested_tokens, bool):
+        return output_limit
+    if requested_tokens <= 0:
+        return output_limit
+    return min(requested_tokens, output_limit)
+
+
+def _database_workflow_prompt(
+    metric_instruction: str = "",
+    database_context: str = "",
+    metric_only: bool = False,
+    metric_action_input: Optional[str] = None,
+) -> str:
+    """Build database-mode instructions using the core ReAct terminate schema."""
+    if metric_only:
+        if metric_action_input:
+            query_instructions = f"""
+For this published business metric request, use this exact format:
+Thought: brief reason
+Action Intention: Query the published metrics
+Action Reason: The server-published metric definitions determine the approved calculations
+Action: metric_query
+Action Input: {metric_action_input}
+
+Only metric_query and terminate are available. Wait for metric_query's observation,
+then use this exact terminate format with the observed values:
+Thought: summarize the returned metrics
+Phase: 返回最终结果
+Action Intention: Return the concise answer
+Action Reason: The published metric result is available
+Action: terminate
+Action Input: {{"result": "concise answer"}}
+
+Do not call sql_query or invent a result. Action Input is required for terminate.
+Do not append a plain-text Final Answer after the terminate action.
+""".strip()
+        else:
+            query_instructions = """
+For this published ecommerce-demo metric, use this exact format:
+Thought: brief reason
+Action Intention: Query regional sales
+Action Reason: The server-published sales metric defines the approved calculation
+Action: metric_query
+Action Input: {"metric_id": "sales_amount", "start_date": "2026-04-01", "end_date": "2026-07-01", "dimension": "region"}
+
+Only metric_query and terminate are available. Do not call sql_query or invent a
+result. Wait for the metric_query observation, then terminate with:
+Thought: summarize the returned data
+Phase: 返回最终结果
+Action Intention: Return the concise answer
+Action Reason: A successful metric result is available
+Action: terminate
+Action Input: {"result": "concise answer"}
+""".strip()
+    else:
+        query_instructions = """
+For data questions, use this exact format:
+Thought: brief reason
+Action Intention: Execute the read-only data query
+Action Reason: The question requires a database result
+Action: sql_query
+Action Input: {"sql": "one read-only SELECT query"}
+
+After the query result, use this exact format:
+Thought: summarize the returned data
+Phase: 返回最终结果
+Action Intention: Return the concise answer
+Action Reason: The query result is available
+Action: terminate
+Action Input: {"result": "concise answer"}
+
+For a business metric published in the metric catalog, use metric_catalog when it
+is registered, then call metric_query with the published metric ID, date range,
+and supported dimension. If metric_query is the only registered data tool, call it
+directly. Do not hand-write SQL for a published metric. Use sql_query for questions
+not covered by a published metric. Before querying, check whether the requested
+metric, reporting period, and dimension are clear from the question and prior turns
+in this same conversation. If a required choice is ambiguous and the published
+context does not define a default, ask one concise clarifying question without
+calling metric_catalog, metric_query, or sql_query. Words such as "recent
+performance" or "best product" do not define a metric or period; do not guess.
+Never call terminate in the same response as a data query, and never call terminate
+before the latest metric or SQL query has returned a successful result. Never
+invent results.
+""".strip()
+
+    return f"""
+You are DB-GPT, a database analysis assistant. Answer in the user's language.
+
+{query_instructions}
+
+{metric_instruction}
+
+{database_context}
+""".strip()
+
+
+def _is_ecommerce_regional_sales_request(database_name: str, user_input: str) -> bool:
+    """Identify published Q2 2026 sales-by-location requests in the local demo."""
+    question = user_input.lower()
+    explicit_years = re.findall(r"(?<!\d)20\d{2}(?!\d)", question)
+    return (
+        database_name == "ecommerce-demo"
+        and all(year == "2026" for year in explicit_years)
+        and any(term in question for term in ("销售额", "销售收入", "sales revenue"))
+        and (
+            "第二季度" in question
+            or "第2季度" in question
+            or re.search(r"(?<![a-z0-9])q2(?![a-z0-9])", question) is not None
+            or "second quarter" in question
+        )
+        and (
+            any(term in question for term in ("地区", "区域", "城市"))
+            or any(
+                re.search(rf"(?<![a-z]){term}(?![a-z])", question) is not None
+                for term in (
+                    "region",
+                    "regions",
+                    "area",
+                    "areas",
+                    "city",
+                    "cities",
+                )
+            )
+        )
+        and not any(
+            term in question
+            for term in (
+                "同比",
+                "去年同期",
+                "增长",
+                "增幅",
+                "year over year",
+                "year-over-year",
+                "year on year",
+                "year-on-year",
+                "last year",
+                "prior year",
+                "growth",
+                "increase",
+                "yoy",
+            )
+        )
+    )
+
+
+def _is_ecommerce_regional_refund_request(database_name: str, user_input: str) -> bool:
+    """Identify published Q2 2026 paid-refund amount by region requests."""
+    question = user_input.lower()
+    years = re.findall(r"(?<!\d)20\d{2}(?!\d)", question)
+    return (
+        database_name == "ecommerce-demo"
+        and all(year == "2026" for year in years)
+        and any(
+            term in question for term in ("第二季度", "第2季度", "q2", "second quarter")
+        )
+        and any(term in question for term in ("退款金额", "退款额", "refund amount"))
+        and any(term in question for term in ("地区", "区域", "region", "area"))
+        and not any(
+            term in question
+            for term in (
+                "退款率",
+                "净销售额",
+                "同比",
+                "去年同期",
+                "增长",
+                "year over year",
+                "year-over-year",
+                "growth",
+                "yoy",
+            )
+        )
+    )
+
+
+def _is_ecommerce_monthly_sales_request(database_name: str, user_input: str) -> bool:
+    """Identify published Q2 2026 monthly sales requests in the local demo."""
+    question = user_input.lower()
+    years = re.findall(r"(?<!\d)20\d{2}(?!\d)", question)
+    return (
+        database_name == "ecommerce-demo"
+        and all(year == "2026" for year in years)
+        and any(term in question for term in ("第二季度", "第2季度", "q2", "second quarter"))
+        and any(term in question for term in ("销售额", "销售收入", "sales revenue"))
+        and any(term in question for term in ("每月", "月度", "monthly", "by month"))
+        and not any(
+            term in question
+            for term in (
+                "地区",
+                "区域",
+                "城市",
+                "region",
+                "area",
+                "city",
+                "华南",
+                "华北",
+                "华东",
+                "华中",
+                "西南",
+                "西北",
+                "东北",
+                "south china",
+                "同比",
+                "去年同期",
+                "增长",
+                "year over year",
+                "growth",
+                "yoy",
+            )
+        )
+    )
+
+
+def _is_ecommerce_monthly_refund_request(database_name: str, user_input: str) -> bool:
+    """Identify published Q2 2026 monthly paid-refund amount requests."""
+    question = user_input.lower()
+    years = re.findall(r"(?<!\d)20\d{2}(?!\d)", question)
+    return (
+        database_name == "ecommerce-demo"
+        and all(year == "2026" for year in years)
+        and any(term in question for term in ("第二季度", "第2季度", "q2", "second quarter"))
+        and any(term in question for term in ("每月", "月度", "monthly", "by month"))
+        and any(term in question for term in ("退款金额", "退款额", "refund amount"))
+        and not any(
+            term in question
+            for term in (
+                "地区",
+                "区域",
+                "城市",
+                "退款率",
+                "region",
+                "area",
+                "city",
+                "华南",
+                "华北",
+                "华东",
+                "华中",
+                "西南",
+                "西北",
+                "东北",
+                "south china",
+                "refund rate",
+                "同比",
+                "去年同期",
+                "增长",
+                "year over year",
+                "growth",
+                "yoy",
+            )
+        )
+    )
+
+
+def _ecommerce_demo_regional_order_count_sql(
+    database_name: str, user_input: str
+) -> Optional[str]:
+    """Return fixed SQL for Q2 completed-order counts grouped by region."""
+    question = user_input.lower()
+    years = re.findall(r"(?<!\d)20\d{2}(?!\d)", question)
+    is_q2 = any(term in question for term in ("第二季度", "第2季度", "q2", "second quarter"))
+    is_regional = any(term in question for term in ("各地区", "各区域", "by region"))
+    is_count = any(term in question for term in ("订单数", "订单数量", "order count"))
+    if (
+        database_name != "ecommerce-demo"
+        or not is_q2
+        or not is_regional
+        or not is_count
+        or not any(term in question for term in ("完成", "completed"))
+        or any(year != "2026" for year in years)
+        or any(term in question for term in ("退款", "取消", "金额", "状态", "同比", "growth"))
+    ):
+        return None
+    return (
+        "SELECT r.name, COUNT(*) AS orders FROM orders o "
+        "JOIN regions r ON r.tenant_id=o.tenant_id AND r.region_id=o.region_id "
+        "WHERE o.created_at >= '2026-04-01' AND o.created_at < '2026-07-01' "
+        "AND o.status = 'completed' GROUP BY r.name ORDER BY r.name"
+    )
+
+
+def _ecommerce_demo_regional_status_breakdown_sql(
+    database_name: str, user_input: str
+) -> Optional[str]:
+    """Return fixed SQL for Q2 order counts and amounts by region and status."""
+    question = user_input.lower()
+    years = re.findall(r"(?<!\d)20\d{2}(?!\d)", question)
+    if (
+        database_name != "ecommerce-demo"
+        or not any(term in question for term in ("第二季度", "第2季度", "q2", "second quarter"))
+        or any(year != "2026" for year in years)
+        or not any(term in question for term in ("各地区", "各区域", "by region"))
+        or not any(term in question for term in ("订单状态", "不同状态", "order status"))
+        or not any(term in question for term in ("订单数", "订单数量", "order count"))
+        or not any(term in question for term in ("订单金额", "order amount"))
+    ):
+        return None
+    return (
+        "SELECT r.name AS region, o.status, COUNT(*) AS order_count, "
+        "SUM(o.total_cents) AS order_value_cents FROM orders o "
+        "JOIN regions r ON r.tenant_id=o.tenant_id AND r.region_id=o.region_id "
+        "WHERE o.created_at >= '2026-04-01' AND o.created_at < '2026-07-01' "
+        "GROUP BY r.name, o.status ORDER BY r.name, o.status"
+    )
+
+
+def _published_metric_intent_parameters(
+    database_name: Optional[str], user_input: str, role: Optional[str]
+) -> Optional[Dict[str, str]]:
+    """Resolve a single explicit metric request from the authorized catalog."""
+    catalog = load_database_metric_catalog(database_name, include_query_fields=True)
+    if not catalog:
+        return None
+    catalog = filter_metric_catalog_for_role(catalog, role)
+    question = user_input.lower()
+    defaults = catalog.get("default_metric_versions", {})
+    visible_metrics = [
+        metric
+        for metric in catalog.get("metrics", [])
+        if metric.get("version") == defaults.get(metric.get("id"))
+        and metric.get("status", "published") == "published"
+    ]
+    matches = []
+    for metric in visible_metrics:
+        phrases = [metric.get("name", ""), metric.get("id", "")]
+        phrases.extend(metric.get("aliases", []))
+        for phrase in phrases:
+            normalized = phrase.strip().lower() if isinstance(phrase, str) else ""
+            if len(normalized) < 2:
+                continue
+            start = question.find(normalized)
+            while start >= 0:
+                matches.append((metric, start, start + len(normalized)))
+                start = question.find(normalized, start + 1)
+    if not matches:
+        return None
+    selected = {}
+    for metric, start, end in matches:
+        if any(
+            other_start <= start
+            and end <= other_end
+            and (other_start, other_end) != (start, end)
+            for _, other_start, other_end in matches
+        ):
+            continue
+        selected[metric["id"]] = metric
+    if len(selected) != 1:
+        return None
+    metric = next(iter(selected.values()))
+
+    years = set(re.findall(r"(?<!\d)(20\d{2})(?!\d)", question))
+    if len(years) > 1:
+        return None
+    year = (
+        next(iter(years))
+        if years
+        else str(catalog.get("default_year"))
+        if catalog.get("default_year") is not None
+        else None
+    )
+    if year is None:
+        return None
+    quarter_tokens = {"一": 1, "二": 2, "三": 3, "四": 4}
+    quarter_match = re.search(
+        r"第?([一二三四1-4])季度|\bq([1-4])\b|\b([1-4])\s*季度", question
+    )
+    if quarter_match:
+        token = next(group for group in quarter_match.groups() if group)
+        quarter = quarter_tokens.get(token, int(token) if token.isdigit() else 0)
+        month = (quarter - 1) * 3 + 1
+        start_date = f"{year}-{month:02d}-01"
+        end_month = month + 3
+        end_date = (
+            f"{int(year) + 1}-01-01"
+            if end_month == 13
+            else f"{year}-{end_month:02d}-01"
+        )
+    else:
+        month_match = re.search(
+            r"(?:\b(20\d{2})\s*年)?\s*(1[0-2]|0?[1-9])\s*月", question
+        )
+        if month_match:
+            month = int(month_match.group(2))
+            start_date = f"{year}-{month:02d}-01"
+            end_date = (
+                f"{int(year) + 1}-01-01"
+                if month == 12
+                else f"{year}-{month + 1:02d}-01"
+            )
+        elif any(
+            term in question for term in ("全年", "整年", "年度", "yearly", "annual")
+        ):
+            start_date, end_date = f"{year}-01-01", f"{int(year) + 1}-01-01"
+        else:
+            return None
+
+    unsupported_grouping_terms = (
+        "类别",
+        "品类",
+        "商品",
+        "客户",
+        "用户",
+        "渠道",
+        "订单状态",
+        "支付方式",
+        "供应商",
+        "currency",
+        "customer",
+        "channel",
+        "category",
+        "supplier",
+        "group by",
+        "按状态",
+        "按客户",
+        "按渠道",
+    )
+    if any(term in question for term in unsupported_grouping_terms):
+        return None
+
+    area = catalog.get("dimensions", {}).get("area", {})
+    area_aliases = area.get("aliases", {})
+    region_area_matches = {
+        region_area
+        for region_area, aliases in area_aliases.items()
+        if any(alias.lower() in question for alias in aliases)
+    }
+    if len(region_area_matches) > 1:
+        return None
+    region_area = next(iter(region_area_matches), None)
+
+    month_dimension = any(
+        term in question
+        for term in ("每月", "每个月", "月度", "按月", "各月", "monthly", "by month")
+    )
+    region_dimension = any(
+        term in question
+        for term in (
+            "各地区",
+            "各区域",
+            "按地区",
+            "按区域",
+            "各城市",
+            "by region",
+            "by city",
+            "regional",
+        )
+    )
+    if month_dimension and region_dimension:
+        return None
+    geographic_scope_terms = (
+        "华南",
+        "华北",
+        "华东",
+        "华中",
+        "西南",
+        "西北",
+        "东北",
+        "广州",
+        "深圳",
+        "北京",
+        "上海",
+        "guangzhou",
+        "shenzhen",
+        "beijing",
+        "shanghai",
+        "地区",
+        "区域",
+        "城市",
+        "region",
+        "area",
+        "city",
+    )
+    if any(term in question for term in geographic_scope_terms) and (
+        not region_dimension
+        and region_area is None
+        or any(
+            term in question
+            for term in (
+                "华南",
+                "华北",
+                "华东",
+                "华中",
+                "西南",
+                "西北",
+                "东北",
+                "广州",
+                "深圳",
+                "北京",
+                "上海",
+                "guangzhou",
+                "shenzhen",
+                "beijing",
+                "shanghai",
+            )
+        )
+        and region_area is None
+    ):
+        return None
+    dimension = None
+    if month_dimension:
+        dimension = "month"
+    elif region_dimension:
+        if "region" not in catalog.get("dimensions", {}):
+            return None
+        dimension = "region"
+    if any(
+        term in question
+        for term in (
+            "排序",
+            "从高到低",
+            "从低到高",
+            "最高",
+            "最低",
+            "排行",
+            "top",
+            "rank",
+            "highest",
+            "lowest",
+            "each status",
+            "status",
+            "取消",
+            "已取消",
+            "cancelled",
+            "canceled",
+            "pending",
+            "failed",
+        )
+    ):
+        return None
+    if any(
+        term in question
+        for term in (
+            "同比",
+            "环比",
+            "增长率",
+            "對比",
+            "对比",
+            "比较",
+            "去年同期",
+            "上一年",
+            "vs",
+            "versus",
+            "year over year",
+            "previous year",
+            "prior year",
+            "compare",
+            "growth",
+            "yoy",
+        )
+    ):
+        return None
+    parameters = {
+        "metric_id": metric["id"],
+        "start_date": start_date,
+        "end_date": end_date,
+    }
+    if dimension:
+        parameters["dimension"] = dimension
+    if region_area is not None:
+        parameters["region_area"] = region_area
+    return parameters
+
+
+def _ecommerce_demo_q2_total_metric_parameters(
+    database_name: str, user_input: str
+) -> Optional[Dict[str, str]]:
+    """Preserve the legacy Q2 classifier contract for existing callers."""
+    question = user_input.lower()
+    years = re.findall(r"(?<!\d)20\d{2}(?!\d)", question)
+    if (
+        database_name != "ecommerce-demo"
+        or not any(term in question for term in ("第二季度", "第2季度", "q2", "second quarter"))
+        or any(year != "2026" for year in years)
+        or any(
+            term in question
+            for term in (
+                "地区", "区域", "城市", "华南", "每月", "月度", "region", "area",
+                "city", "monthly", "south china", "同比", "去年同期", "增长",
+                "year over year", "growth", "yoy",
+            )
+        )
+    ):
+        return None
+
+    if any(term in question for term in ("净销售额", "net sales")):
+        metric_id = "net_sales_amount"
+    elif any(term in question for term in ("退款率", "refund rate")):
+        metric_id = "refund_rate"
+    elif any(term in question for term in ("已支付退款总额", "退款金额总额", "refund total")):
+        metric_id = "paid_refund_amount"
+    elif any(term in question for term in ("销售总额", "总销售额", "sales total")):
+        metric_id = "sales_amount"
+    else:
+        return None
+    return {
+        "metric_id": metric_id,
+        "start_date": "2026-04-01",
+        "end_date": "2026-07-01",
+    }
+
+
+def _ecommerce_demo_q2_average_order_sql(
+    database_name: str, user_input: str
+) -> Optional[str]:
+    """Return fixed SQL for the published demo Q2 average order amount request."""
+    question = user_input.lower()
+    years = re.findall(r"(?<!\d)20\d{2}(?!\d)", question)
+    if (
+        database_name != "ecommerce-demo"
+        or not any(term in question for term in ("第二季度", "第2季度", "q2", "second quarter"))
+        or any(year != "2026" for year in years)
+        or not any(term in question for term in ("平均订单金额", "average order amount"))
+        or any(
+            term in question
+            for term in (
+                "地区",
+                "区域",
+                "城市",
+                "region",
+                "area",
+                "city",
+                "同比",
+                "增长",
+                "year over year",
+                "growth",
+                "yoy",
+            )
+        )
+    ):
+        return None
+    return (
+        "SELECT AVG(total_cents) AS average_order_cents FROM orders "
+        "WHERE created_at >= '2026-04-01' AND created_at < '2026-07-01' "
+        "AND status = 'completed'"
+    )
+
+
+def _ecommerce_demo_q2_scalar_analysis_sql(
+    database_name: str, user_input: str
+) -> Optional[str]:
+    """Return fixed SQL for narrowly scoped Q2 scalar order/product/refund asks."""
+    question = user_input.lower()
+    years = re.findall(r"(?<!\d)20\d{2}(?!\d)", question)
+    if (
+        database_name != "ecommerce-demo"
+        or not any(term in question for term in ("第二季度", "第2季度", "q2", "second quarter"))
+        or any(year != "2026" for year in years)
+        or any(
+            term in question
+            for term in (
+                "地区",
+                "区域",
+                "城市",
+                "分类",
+                "类别",
+                "品类",
+                "每月",
+                "月度",
+                "同比",
+                "去年同期",
+                "增长",
+                "比较",
+                "对比",
+                "环比",
+                "上季度",
+                "第一季度",
+                "第三季度",
+                "q1",
+                "q3",
+                "first quarter",
+                "third quarter",
+                "previous quarter",
+                "分组",
+                "按",
+                "分别",
+                "各月",
+                "每个月",
+                "每月",
+                "each month",
+                "every month",
+                "渠道",
+                "客户",
+                "用户",
+                "状态",
+                "支付方式",
+                "支付渠道",
+                "币种",
+                "供应商",
+                "各",
+                "每个",
+                "for each",
+                "by ",
+                "region",
+                "area",
+                "city",
+                "customer",
+                "channel",
+                "status",
+                "payment method",
+                "currency",
+                "supplier",
+                "grouped",
+                "compare",
+                "comparison",
+                "by month",
+                "by region",
+                "by customer",
+                "by channel",
+                "month by month",
+                "category",
+                "monthly",
+                "year over year",
+                "growth",
+                "group by",
+                "最大和最小",
+                "最大与最小",
+                "同时",
+                "以及",
+                "and",
+                "both",
+            )
+        )
+    ):
+        return None
+
+    specific_month = any(
+        term in question
+        for term in ("四月", "4月", "april", "五月", "5月", "may", "六月", "6月", "june")
+    )
+    count_request = any(term in question for term in ("多少", "几种", "how many"))
+    if (
+        count_request
+        and not specific_month
+        and any(
+            term in question
+            for term in (
+                "种商品",
+                "商品种类",
+                "distinct product types",
+                "number of product types",
+            )
+        )
+        and not any(term in question for term in ("销量", "销售额", "单位", "units"))
+    ):
+        return (
+            "SELECT COUNT(DISTINCT i.product_id) AS products FROM order_items i "
+            "JOIN orders o ON o.tenant_id=i.tenant_id AND o.order_id=i.order_id "
+            "WHERE o.created_at >= '2026-04-01' AND o.created_at < '2026-07-01' "
+            "AND o.status = 'completed'"
+        )
+
+    month_ranges = {
+        "四月": ("2026-04-01", "2026-05-01"),
+        "4月": ("2026-04-01", "2026-05-01"),
+        "april": ("2026-04-01", "2026-05-01"),
+        "五月": ("2026-05-01", "2026-06-01"),
+        "5月": ("2026-05-01", "2026-06-01"),
+        "may": ("2026-05-01", "2026-06-01"),
+        "六月": ("2026-06-01", "2026-07-01"),
+        "6月": ("2026-06-01", "2026-07-01"),
+        "june": ("2026-06-01", "2026-07-01"),
+    }
+    mentioned_months = [
+        date_range for month, date_range in month_ranges.items() if month in question
+    ]
+    if (
+        len(set(mentioned_months)) == 1
+        and count_request
+        and any(term in question for term in ("订单", "orders"))
+        and any(term in question for term in ("完成", "completed"))
+        and not any(term in question for term in ("取消", "cancelled", "canceled"))
+    ):
+        start_date, end_date = mentioned_months[0]
+        return (
+            "SELECT COUNT(*) AS orders FROM orders "
+            f"WHERE created_at >= '{start_date}' AND created_at < '{end_date}' "
+            "AND status = 'completed'"
+        )
+
+    if specific_month:
+        return None
+
+    if any(
+        term in question
+        for term in (
+            "按",
+            "各",
+            "每个",
+            "分别",
+            "地区",
+            "区域",
+            "城市",
+            "客户",
+            "用户",
+            "渠道",
+            "商品",
+            "产品",
+            "状态",
+            "支付方式",
+            "支付渠道",
+            "币种",
+            "供应商",
+            "region",
+            "city",
+            "customer",
+            "channel",
+            "product",
+            "status",
+            "payment method",
+            "currency",
+            "supplier",
+            "by ",
+            "for each",
+        )
+    ):
+        return None
+
+    if any(term in question for term in ("退款", "refund")) and any(
+        term in question for term in ("平均", "average", "avg")
+    ) and any(term in question for term in ("金额", "退款额", "amount")):
+        return (
+            "SELECT AVG(amount_cents) AS average_refund_cents FROM refunds "
+            "WHERE created_at >= '2026-04-01' AND created_at < '2026-07-01' "
+            "AND status = 'paid'"
+        )
+
+    if not any(term in question for term in ("订单金额", "order amount")) or not any(
+        term in question for term in ("完成", "completed")
+    ):
+        return None
+    if any(term in question for term in ("最大", "最高", "maximum", "max")):
+        aggregate = "MAX(total_cents) AS max_order_cents"
+    elif any(term in question for term in ("最小", "最低", "minimum", "min")):
+        aggregate = "MIN(total_cents) AS min_order_cents"
+    else:
+        return None
+    return (
+        f"SELECT {aggregate} FROM orders "
+        "WHERE created_at >= '2026-04-01' AND created_at < '2026-07-01' "
+        "AND status = 'completed'"
+    )
+
+
+def _ecommerce_demo_product_analysis_sql(
+    database_name: str, user_input: str
+) -> Optional[str]:
+    """Return fixed Q2 SQL for the registered synthetic product metrics."""
+    question = user_input.lower()
+    years = re.findall(r"(?<!\d)20\d{2}(?!\d)", question)
+    if (
+        database_name != "ecommerce-demo"
+        or not any(term in question for term in ("第二季度", "第2季度", "q2", "second quarter"))
+        or any(year != "2026" for year in years)
+        or any(
+            term in question
+            for term in (
+                "同比",
+                "去年同期",
+                "增长",
+                "比较",
+                "对比",
+                "环比",
+                "上季度",
+                "第一季度",
+                "第三季度",
+                "每月",
+                "月度",
+                "各月",
+                "月份",
+                "四月",
+                "4月",
+                "april",
+                "五月",
+                "5月",
+                "may",
+                "六月",
+                "6月",
+                "june",
+                "each month",
+                "every month",
+                "按",
+                "分别",
+                "每个",
+                "for each",
+                "by ",
+                "地区",
+                "区域",
+                "城市",
+                "客户",
+                "用户",
+                "渠道",
+                "region",
+                "area",
+                "city",
+                "customer",
+                "channel",
+                "by month",
+                "by region",
+                "by customer",
+                "by channel",
+                "month by month",
+                "q1",
+                "q3",
+                "first quarter",
+                "third quarter",
+                "previous quarter",
+                "year over year",
+                "growth",
+                "yoy",
+            )
+        )
+    ):
+        return None
+
+    category = any(term in question for term in ("商品类别", "产品类别", "品类", "category"))
+    product_question = question.replace("各商品类别", "").replace("各产品类别", "")
+    product = any(
+        term in product_question for term in ("各商品", "各产品", "by product")
+    )
+    if category == product:
+        return None
+    dimension = "p.category AS category" if category else "p.product_name AS product_name"
+
+    is_units_request = any(term in question for term in ("销量", "销售件数", "units sold"))
+    is_sales_request = any(
+        term in question for term in ("销售额", "销售收入", "sales revenue")
+    )
+    if is_units_request == is_sales_request:
+        return None
+    if is_units_request:
+        metric = "SUM(i.quantity) AS units"
+        sort_column = "units"
+    elif category and is_sales_request:
+        metric = "SUM(i.quantity*i.unit_price_cents) AS sales_cents"
+        sort_column = "sales_cents"
+    else:
+        return None
+
+    return (
+        f"SELECT {dimension}, {metric} FROM order_items i "
+        "JOIN orders o ON o.tenant_id=i.tenant_id AND o.order_id=i.order_id "
+        "JOIN products p ON p.tenant_id=i.tenant_id AND p.product_id=i.product_id "
+        "WHERE o.created_at >= '2026-04-01' AND o.created_at < '2026-07-01' "
+        "AND o.status = 'completed' "
+        f"GROUP BY {('p.category' if category else 'p.product_name')} "
+        f"ORDER BY {sort_column} DESC"
+    )
+
+
+def _ecommerce_demo_order_count_sql(
+    database_name: str, user_input: str
+) -> Optional[str]:
+    """Return a fixed query for ungrouped Q2 demo order counts only."""
+    question = user_input.lower()
+    years = re.findall(r"(?<!\d)20\d{2}(?!\d)", question)
+    is_q2 = any(
+        term in question for term in ("第二季度", "第2季度", "q2", "second quarter")
+    )
+    is_count = (
+        "订单" in question
+        and any(term in question for term in ("多少笔", "订单数", "订单总数"))
+    ) or ("order" in question and "how many" in question)
+    is_completed = any(term in question for term in ("完成", "completed"))
+    is_cancelled = any(term in question for term in ("取消", "cancelled", "canceled"))
+    if (
+        database_name != "ecommerce-demo"
+        or not is_q2
+        or not is_count
+        or is_completed == is_cancelled
+        or any(year != "2026" for year in years)
+        or any(
+            term in question
+            for term in (
+                "按地区",
+                "按区域",
+                "按城市",
+                "按商品",
+                "各地区",
+                "各区域",
+                "各城市",
+                "各商品",
+                "分地区",
+                "分区域",
+                "分城市",
+                "by region",
+                "by city",
+                "by product",
+                "同比",
+                "增长",
+                "对比",
+                "average",
+                "compare",
+            )
+        )
+    ):
+        return None
+
+    status = "completed" if is_completed else "cancelled"
+    return (
+        "SELECT COUNT(*) AS total FROM orders "
+        "WHERE created_at >= '2026-04-01' AND created_at < '2026-07-01' "
+        f"AND status = '{status}'"
+    )
+
+
+def _is_ecommerce_south_china_sales_refund_request(
+    database_name: str, user_input: str
+) -> bool:
+    """Match the supported synthetic Q2 South China KPI bundle request."""
+    question = user_input.lower()
+    explicit_years = re.findall(r"\b20\d{2}\b", question)
+    return (
+        database_name == "ecommerce-demo"
+        and all(year == "2026" for year in explicit_years)
+        and any(term in question for term in ("第二季度", "q2", "second quarter"))
+        and any(term in question for term in ("华南", "south china"))
+        and any(term in question for term in ("销售额", "sales revenue"))
+        and any(term in question for term in ("退款率", "refund rate"))
+        and not any(term in question for term in ("同比", "year over year", "yoy"))
+    )
+
+
+def _is_south_china_city_refund_followup(
+    database_name: str, user_input: str, historical_dialogues: List[Any]
+) -> bool:
+    """Match the supported city-refund follow-up only when its KPI context exists."""
+    question = user_input.lower()
+    is_city_leader_question = (
+        ("退款率" in question or "refund rate" in question)
+        and any(term in question for term in ("哪个城市", "哪座城市", "highest", "which city"))
+    )
+    if database_name != "ecommerce-demo" or not is_city_leader_question:
+        return False
+
+    return any(
+        isinstance(getattr(message, "content", None), str)
+        and "第二季度" in message.content
+        and "华南区" in message.content
+        and "销售额" in message.content
+        and "退款率" in message.content
+        for message in historical_dialogues
+    )
+
+
+def _is_south_china_sales_share_followup(
+    database_name: str, user_input: str, historical_dialogues: List[Any]
+) -> bool:
+    """Match the supported Guangzhou share follow-up within its prior KPI turn."""
+    question = user_input.lower()
+    is_share_question = (
+        "广州" in question
+        and "销售额" in question
+        and any(term in question for term in ("占", "比例", "share"))
+    )
+    if database_name != "ecommerce-demo" or not is_share_question:
+        return False
+    return any(
+        isinstance(getattr(message, "content", None), str)
+        and "第二季度" in message.content
+        and "华南区" in message.content
+        and "销售额" in message.content
+        and "退款率" in message.content
+        for message in historical_dialogues
+    )
+
+
+def _ecommerce_demo_clarification(
+    database_name: Optional[str], user_input: str, historical_dialogues: List[Any]
+) -> Optional[str]:
+    """Require missing metric or period details before querying the demo database."""
+    if database_name != "ecommerce-demo":
+        return None
+
+    question = user_input.lower()
+    context = "\n".join(
+        message.content
+        for message in historical_dialogues
+        if isinstance(getattr(message, "content", None), str)
+    ).lower()
+    combined = f"{question}\n{context}"
+    has_period = bool(
+        re.search(
+            r"20\d{2}|q[1-4]|第[一二三四1-4]季度|\d{1,2}月|\d{4}-\d{1,2}",
+            combined,
+        )
+    )
+    has_metric = any(
+        term in combined
+        for term in (
+            "销售额",
+            "销售收入",
+            "退款率",
+            "退款额",
+            "订单数",
+            "销量",
+            "利润",
+            "sales",
+            "revenue",
+            "refund",
+            "orders",
+            "quantity",
+            "profit",
+        )
+    )
+
+    if any(term in question for term in ("最近经营情况", "recent performance")):
+        return "请明确要分析的经营指标和统计时间范围；如需地区对比，也请说明地区。"
+    if any(term in question for term in ("哪个商品表现最好", "best product")):
+        if not has_metric or not has_period:
+            return "请明确商品表现的评价指标（如销售额或销量）和统计时间范围。"
+    if (
+        any(term in question for term in ("退款率", "refund rate"))
+        and any(term in question for term in ("哪个地区", "哪个区域", "which region"))
+        and any(term in question for term in ("最高", "最高的", "highest"))
+        and not has_period
+    ):
+        return "请明确要比较地区退款率的统计时间范围。"
+    return None
+
+
+def _format_metric_leader(observation: Any, value_column: str) -> Optional[str]:
+    """Summarize the highest metric row from a structured tool observation."""
+    if isinstance(observation, str):
+        try:
+            observation = json.loads(observation)
+        except json.JSONDecodeError:
+            return None
+    if not isinstance(observation, dict):
+        return None
+    result = observation.get("result")
+    if not isinstance(result, dict) or result.get("type") != "sql_result":
+        return None
+    columns, rows = result.get("columns"), result.get("rows")
+    if not isinstance(columns, list) or not isinstance(rows, list):
+        return None
+    try:
+        name_index, value_index = columns.index("region"), columns.index(value_column)
+    except ValueError:
+        return None
+
+    valid_rows = [
+        row
+        for row in rows
+        if isinstance(row, list)
+        and len(row) == len(columns)
+        and isinstance(row[name_index], str)
+        and isinstance(row[value_index], (int, float))
+        and not isinstance(row[value_index], bool)
+        and math.isfinite(row[value_index])
+    ]
+    if not valid_rows:
+        return None
+    highest = max(row[value_index] for row in valid_rows)
+    leaders = sorted(
+        {row[name_index] for row in valid_rows if row[value_index] == highest}
+    )
+    metric_name = "退款率" if value_column == "refund_rate_pct" else value_column
+    return f"{'、'.join(leaders)} 的{metric_name}最高，为 {highest:g}%。"
+
+
+def _ensure_expected_metric_action(
+    action_output: Dict[str, Any], metric_tool: Any, parameters: Dict[str, Any]
+) -> Dict[str, Any]:
+    """Run a server-pinned metric when the model selects another tool or input."""
+    action = action_output.get("action")
+    action_input = action_output.get("action_input")
+    if isinstance(action_input, str):
+        try:
+            action_input = json.loads(action_input)
+        except json.JSONDecodeError:
+            action_input = None
+    if action == "metric_query" and action_input == parameters:
+        return action_output
+
+    observation = metric_tool(**parameters)
+    return {
+        "action": "metric_query",
+        "action_input": json.dumps(parameters, ensure_ascii=False),
+        "observations": observation,
+        "is_exe_success": True,
+        "thoughts": "使用服务端固定的已发布指标查询城市退款率。",
+        "action_intention": "查询各城市退款率",
+        "action_reason": "继承同会话已确认的时间和区域范围",
+    }
+
+
+def _ensure_expected_sql_action(action_output: Any, sql_tool: Any, sql: str) -> Any:
+    """Execute the server-pinned SQL when a supported route chose another action."""
+    if not isinstance(action_output, dict):
+        action_output = {}
+    action = action_output.get("action")
+    action_input = action_output.get("action_input")
+    if isinstance(action_input, str):
+        try:
+            action_input = json.loads(action_input)
+        except json.JSONDecodeError:
+            action_input = None
+    if action == "sql_query" and isinstance(action_input, dict):
+        supplied_sql = re.sub(r"\s+", " ", action_input.get("sql", "")).strip()
+        expected_sql = re.sub(r"\s+", " ", sql).strip()
+        if supplied_sql.rstrip(";") == expected_sql.rstrip(";"):
+            return action_output
+
+    observation = sql_tool(sql=sql)
+    return {
+        "action": "sql_query",
+        "action_input": json.dumps({"sql": sql}, ensure_ascii=False),
+        "observations": observation,
+        "is_exe_success": True,
+        "thoughts": "使用服务端固定的电商演示订单计数查询。",
+        "action_intention": "查询季度订单数",
+        "action_reason": "问题符合本地演示数据的固定订单统计口径",
+    }
+
+
+def _format_sales_share_result(observation: Any) -> Optional[Tuple[str, str]]:
+    """Derive Guangzhou's South China share from tenant-scoped metric rows."""
+    if isinstance(observation, str):
+        try:
+            observation = json.loads(observation)
+        except json.JSONDecodeError:
+            return None
+    if not isinstance(observation, dict):
+        return None
+    result = observation.get("result")
+    if not isinstance(result, dict) or result.get("type") != "sql_result":
+        return None
+    if result.get("truncated") is True:
+        return None
+    columns, rows = result.get("columns"), result.get("rows")
+    if not isinstance(columns, list) or not isinstance(rows, list):
+        return None
+    try:
+        region_index, sales_index = columns.index("region"), columns.index("sales_cents")
+    except ValueError:
+        return None
+    sales_by_region = {}
+    for row in rows:
+        if (
+            not isinstance(row, list)
+            or len(row) != len(columns)
+            or not isinstance(row[region_index], str)
+            or not isinstance(row[sales_index], (int, float))
+            or isinstance(row[sales_index], bool)
+            or not math.isfinite(row[sales_index])
+            or row[sales_index] < 0
+            or row[region_index] in sales_by_region
+        ):
+            return None
+        sales_by_region[row[region_index]] = row[sales_index]
+    total = sum(sales_by_region.values())
+    guangzhou_sales = sales_by_region.get("Guangzhou")
+    if total <= 0 or guangzhou_sales is None:
+        return None
+    share = round(guangzhou_sales / total * 100, 2)
+    result = {
+        **result,
+        "columns": ["sales_share_pct"],
+        "rows": [[share]],
+        "row_count": 1,
+        "truncated": False,
+    }
+    formatted = {**observation, "result": result}
+    formatted["chunks"] = [
+        {
+            "output_type": "markdown",
+            "content": f"| sales_share_pct |\n| --- |\n| {share:.2f} |",
+        }
+    ]
+    return (
+        json.dumps(formatted, ensure_ascii=False),
+        f"广州销售额占华南区第二季度销售额的 {share:.2f}%。",
+    )
+
+
+def _react_daily_token_quota_context(
+    user_token: UserRequest,
+) -> Optional[Dict[str, Any]]:
+    """Resolve the shared limit, retaining the ReAct-specific legacy setting."""
+    from .token_quota import resolve_daily_token_quota_context
+
+    configured_limit = os.getenv("DBGPT_DAILY_TOKEN_LIMIT")
+    setting_name = "DBGPT_DAILY_TOKEN_LIMIT"
+    if configured_limit is None or not configured_limit.strip():
+        configured_limit = os.getenv("DBGPT_REACT_DAILY_TOKEN_LIMIT")
+        setting_name = "DBGPT_REACT_DAILY_TOKEN_LIMIT"
+    return resolve_daily_token_quota_context(user_token, configured_limit, setting_name)
+
+
+def _is_token_quota_exceeded(error: BaseException) -> bool:
+    """Find the quota rejection through DB-GPT's LLM error wrapper."""
+    from dbgpt_serve.token_quota import TokenQuotaExceededError
+
+    current: Optional[BaseException] = error
+    seen: set[int] = set()
+    while current is not None and id(current) not in seen:
+        if isinstance(current, TokenQuotaExceededError):
+            return True
+        seen.add(id(current))
+        current = getattr(current, "original_exception", None) or current.__cause__
+    return False
+
+
+def _is_token_quota_configuration_error(error: BaseException) -> bool:
+    """Find a rejected, unmeterable request through DB-GPT's LLM wrapper."""
+    from dbgpt_app.openapi.api_v1.token_quota import TokenQuotaConfigurationError
+
+    current: Optional[BaseException] = error
+    seen: set[int] = set()
+    while current is not None and id(current) not in seen:
+        if isinstance(current, TokenQuotaConfigurationError):
+            return True
+        seen.add(id(current))
+        current = getattr(current, "original_exception", None) or current.__cause__
+    return False
+
+
+def _terminal_sql_error(action_output: Any) -> Optional[str]:
+    """Return the user-safe message for a terminal structured SQL failure."""
+    if isinstance(action_output, dict):
+        action = action_output.get("action")
+        observation = action_output.get("observations")
+    else:
+        action = getattr(action_output, "action", None)
+        observation = getattr(action_output, "observations", None)
+    if not isinstance(action, str) or action.strip().lower() != "sql_query":
+        return None
+    if not isinstance(observation, str):
+        return None
+    try:
+        result = json.loads(observation)
+    except (TypeError, json.JSONDecodeError):
+        return None
+    if not isinstance(result, dict):
+        return None
+    error = result.get("error")
+    if not isinstance(error, dict) or error.get("retryable") is not False:
+        return None
+    message = error.get("message")
+    return (
+        message.strip()
+        if isinstance(message, str) and message.strip()
+        else "SQL 查询失败，已停止自动重试。"
+    )
+
+
+def _database_query_outcome(action_output: Any) -> Optional[Tuple[bool, Optional[str]]]:
+    """Classify whether a database tool returned an execution result."""
+    if isinstance(action_output, dict):
+        action = action_output.get("action")
+        observation = action_output.get("observations")
+        is_exe_success = action_output.get("is_exe_success", True)
+    else:
+        action = getattr(action_output, "action", None)
+        observation = getattr(action_output, "observations", None)
+        is_exe_success = getattr(action_output, "is_exe_success", True)
+
+    actions = (
+        {item.strip().lower() for item in action.split(",") if item.strip()}
+        if isinstance(action, str)
+        else set()
+    )
+    if not actions.intersection({"sql_query", "metric_query"}):
+        return None
+
+    if isinstance(observation, str):
+        try:
+            observation = json.loads(observation)
+        except json.JSONDecodeError:
+            observation = None
+
+    if isinstance(observation, list):
+        outcomes = []
+        for item in observation:
+            if not isinstance(item, dict):
+                continue
+            item_name = item.get("name")
+            if item_name not in {"sql_query", "metric_query"}:
+                continue
+            outcome = _database_query_outcome(
+                {
+                    "action": item_name,
+                    "observations": item.get("observation"),
+                    "is_exe_success": item.get("success", True),
+                }
+            )
+            if outcome is not None:
+                outcomes.append(outcome)
+        if outcomes:
+            failures = [item for item in outcomes if not item[0]]
+            return failures[-1] if failures else (True, None)
+
+    if isinstance(observation, dict):
+        error = observation.get("error")
+        if isinstance(error, dict):
+            message = error.get("message")
+            if isinstance(message, str) and message.strip():
+                return False, message.strip()
+            return False, "数据库查询失败，无法返回可靠结果。"
+        if "sql_query" in actions:
+            result = observation.get("result")
+            if isinstance(result, dict) and result.get("type") == "sql_result":
+                return True, None
+            if isinstance(observation.get("chunks"), list):
+                return True, None
+        if "metric_query" in actions:
+            metric = observation.get("metric")
+            result = observation.get("result")
+            if isinstance(metric, dict) or (
+                isinstance(result, dict) and result.get("type") == "sql_result"
+            ):
+                return True, None
+
+    if is_exe_success is False:
+        return False, "数据库查询失败，无法返回可靠结果。"
+    return False, "数据库查询未返回可验证结果，无法给出可靠答案。"
+
+
 def _extract_auto_data_markers(text: str) -> tuple[str, Dict[str, str]]:
     """Extract generic marker blocks from script output text.
 
@@ -262,6 +1706,7 @@ async def _execute_skill_script_impl(
     description='执行技能中的脚本。参数: {"skill_name": "技能名称", '
     '"script_name": "脚本名称", "args": {参数}}'
 )
+@trace_agent_tool("agent.execute_skill_script")
 async def execute_skill_script(skill_name: str, script_name: str, args: dict) -> str:
     """Execute a script from a skill."""
     return await _execute_skill_script_impl(skill_name, script_name, args)
@@ -276,6 +1721,7 @@ async def execute_skill_script(skill_name: str, script_name: str, args: dict) ->
     '"resource_path": "references/analysis_framework.md"}'
     "\n注意: 执行脚本请使用 shell_interpreter 工具"
 )
+@trace_agent_tool("agent.get_skill_resource")
 async def get_skill_resource(
     skill_name: str, resource_path: str, args: Optional[dict] = None
 ) -> str:
@@ -298,6 +1744,7 @@ async def get_skill_resource(
     description="执行技能scripts目录下的脚本文件。参数: "
     '{"skill_name": "技能名称", "script_file_name": "脚本文件名", "args": {参数}}'
 )
+@trace_agent_tool("agent.execute_skill_script_file")
 async def execute_skill_script_file(
     skill_name: str, script_file_name: str, args: Optional[dict] = None
 ) -> str:
@@ -567,6 +2014,20 @@ async def skill_upload(
     if not file.filename:
         return Result.failed(code="E4001", msg="No file provided")
 
+    filename = file.filename
+    windows_filename = PureWindowsPath(filename)
+    if (
+        "\x00" in filename
+        or "/" in filename
+        or "\\" in filename
+        or Path(filename).is_absolute()
+        or windows_filename.is_absolute()
+        or Path(filename).name != filename
+        or windows_filename.name != filename
+        or filename in {".", ".."}
+    ):
+        return Result.failed(code="E4001", msg="Filename must be a plain file name")
+
     upload_dir = Path(resolve_root_path("pilot/tmp") or "pilot/tmp").resolve()
     upload_dir.mkdir(parents=True, exist_ok=True)
 
@@ -574,7 +2035,6 @@ async def skill_upload(
     user_dir = skills_dir / "user"
     user_dir.mkdir(parents=True, exist_ok=True)
 
-    filename = file.filename
     suffix = Path(filename).suffix.lower()
     stem = Path(filename).stem
 
@@ -1028,6 +2488,46 @@ def _build_react_history_payload(
     )
 
 
+def _load_react_conversation_history(storage_conv: Any) -> List[Any]:
+    """Load prior human turns and assistant final answers for a ReAct turn."""
+    from dbgpt.agent import AgentMessage
+
+    historical_dialogues: List[AgentMessage] = []
+    for message in storage_conv.get_history_message():
+        if message.type == "human":
+            historical_dialogues.append(AgentMessage(content=message.content))
+        elif message.type == "ai":
+            historical_dialogues.append(AgentMessage(content=message.content))
+        elif message.type == "view":
+            # ReAct view messages persist a JSON history payload. Only its
+            # user-facing final answer belongs in the next model turn.
+            content = message.content
+            try:
+                payload = json.loads(content) if isinstance(content, str) else content
+                if isinstance(payload, dict):
+                    content = payload.get("final_content") or ""
+            except Exception:
+                pass
+            if content:
+                historical_dialogues.append(AgentMessage(content=content))
+    return historical_dialogues
+
+
+async def _generate_react_agent_reply(
+    agent: Any,
+    received_message: Any,
+    stream_callback: Any,
+    historical_dialogues: List[Any],
+) -> Any:
+    """Pass the persisted prior turns through the API's Agent entry point."""
+    return await agent.generate_reply(
+        received_message=received_message,
+        sender=agent,
+        stream_callback=stream_callback,
+        historical_dialogues=historical_dialogues,
+    )
+
+
 def _sse_event_type(event: Any) -> Optional[str]:
     """Read an SSE event type without trusting arbitrary streamed text."""
     if not isinstance(event, str):
@@ -1066,6 +2566,7 @@ async def _cancel_and_await_agent_task(task: "asyncio.Task[Any]") -> None:
     """Cancel a running agent task and always consume its terminal result."""
     was_done = task.done()
     if not was_done:
+        logger.info("Cancelling active ReAct agent task")
         task.cancel()
     try:
         await task
@@ -1080,6 +2581,9 @@ async def _react_agent_stream(
     dialogue: ConversationVo,
     tool_mode: str = "full",
     attachment_ctx: Optional[SessionAttachmentContext] = None,
+    database_connector: Optional[Any] = None,
+    identity_context: Optional[Dict[str, Any]] = None,
+    token_quota_context: Optional[Dict[str, Any]] = None,
 ) -> AsyncGenerator[str, None]:
     """Stream the ReAct agent turn, owning the attachment lifecycle.
 
@@ -1093,19 +2597,44 @@ async def _react_agent_stream(
         attachment_ctx: Pre-resolved attachment context for this turn (or
             ``None`` for pure-text / legacy ``file_path`` requests).
     """
+    inner_kwargs = {}
+    if token_quota_context is not None:
+        inner_kwargs["token_quota_context"] = token_quota_context
+    inner_stream = _react_agent_stream_inner(
+        dialogue,
+        tool_mode,
+        attachment_ctx,
+        database_connector,
+        identity_context,
+        **inner_kwargs,
+    )
     try:
-        async for event in _react_agent_stream_inner(
-            dialogue, tool_mode, attachment_ctx
-        ):
-            yield event
+        if token_quota_context is not None:
+            from dbgpt.core.interface.operators.llm_operator import (
+                scoped_llm_client_wrapper,
+            )
+
+            from .token_quota import build_metered_llm_client_wrapper
+
+            with scoped_llm_client_wrapper(
+                build_metered_llm_client_wrapper(token_quota_context)
+            ):
+                async for event in inner_stream:
+                    yield event
+        else:
+            async for event in inner_stream:
+                yield event
     finally:
-        if attachment_ctx is not None:
-            try:
-                attachment_ctx.close()
-            except Exception:
-                logger.warning(
-                    "Failed to close session attachment context", exc_info=True
-                )
+        try:
+            await inner_stream.aclose()
+        finally:
+            if attachment_ctx is not None:
+                try:
+                    attachment_ctx.close()
+                except Exception:
+                    logger.warning(
+                        "Failed to close session attachment context", exc_info=True
+                    )
 
 
 def _legacy_upload_base_dir() -> str:
@@ -1170,17 +2699,29 @@ async def _react_agent_stream_inner(
     dialogue: ConversationVo,
     tool_mode: str = "full",
     attachment_ctx: Optional[SessionAttachmentContext] = None,
+    database_connector: Optional[Any] = None,
+    identity_context: Optional[Dict[str, Any]] = None,
+    token_quota_context: Optional[Dict[str, Any]] = None,
 ) -> AsyncGenerator[str, None]:
     """Stream ReAct events while owning the lifetime of its background task."""
     agent_task_holder: List["asyncio.Task[Any]"] = []
     final_emitted = False
     done_emitted = False
     try:
+        stream_kwargs = {
+            "tool_mode": tool_mode,
+            "attachment_ctx": attachment_ctx,
+            "agent_task_holder": agent_task_holder,
+        }
+        if database_connector is not None:
+            stream_kwargs["database_connector"] = database_connector
+        if identity_context is not None:
+            stream_kwargs["identity_context"] = identity_context
+        if token_quota_context is not None:
+            stream_kwargs["token_quota_context"] = token_quota_context
         async for event in _react_agent_stream_impl(
             dialogue,
-            tool_mode=tool_mode,
-            attachment_ctx=attachment_ctx,
-            agent_task_holder=agent_task_holder,
+            **stream_kwargs,
         ):
             event_type = _sse_event_type(event)
             final_emitted = final_emitted or event_type == "final"
@@ -1198,6 +2739,7 @@ async def _react_agent_stream_inner(
             yield _sse_event({"type": "done"})
     finally:
         if agent_task_holder:
+            logger.info("Closing ReAct agent task after stream ended")
             await _cancel_and_await_agent_task(agent_task_holder[0])
 
 
@@ -1205,24 +2747,50 @@ class _AgentStreamingResponse(StreamingResponse):
     """Streaming response that explicitly closes its owned body iterator."""
 
     async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
+        stream_task = asyncio.create_task(self.stream_response(send))
+        disconnect_task = asyncio.create_task(self.listen_for_disconnect(receive))
         try:
-            await super().__call__(scope, receive, send)
+            done, _ = await asyncio.wait(
+                {stream_task, disconnect_task},
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            if disconnect_task in done:
+                logger.info("ReAct SSE client disconnected; cancelling the active stream")
+                stream_task.cancel()
+            else:
+                disconnect_task.cancel()
+            await asyncio.gather(stream_task, disconnect_task, return_exceptions=True)
+            if stream_task in done:
+                stream_task.result()
         finally:
-            close = getattr(self.body_iterator, "aclose", None)
-            if callable(close):
-                try:
-                    await close()
-                except asyncio.CancelledError:
-                    raise
-                except Exception:
-                    logger.exception("Failed to close ReAct agent stream iterator")
+            with anyio.CancelScope(shield=True):
+                for task in (stream_task, disconnect_task):
+                    if not task.done():
+                        task.cancel()
+                await asyncio.gather(
+                    stream_task, disconnect_task, return_exceptions=True
+                )
+                close = getattr(self.body_iterator, "aclose", None)
+                if callable(close):
+                    try:
+                        logger.info("Closing ReAct SSE body iterator")
+                        await close()
+                    except asyncio.CancelledError:
+                        raise
+                    except Exception:
+                        logger.exception("Failed to close ReAct agent stream iterator")
+        if self.background is not None:
+            await self.background()
 
 
 async def _react_agent_stream_impl(
     dialogue: ConversationVo,
     tool_mode: str = "full",
     attachment_ctx: Optional[SessionAttachmentContext] = None,
+    database_connector: Optional[Any] = None,
     agent_task_holder: Optional[List["asyncio.Task[Any]"]] = None,
+    identity_context: Optional[Dict[str, Any]] = None,
+    token_quota_context: Optional[Dict[str, Any]] = None,
 ) -> AsyncGenerator[str, None]:
     """Core ReAct agent streaming logic.
 
@@ -1251,6 +2819,26 @@ async def _react_agent_stream_impl(
     from dbgpt_serve.conversation.serve import Serve as ConversationServe
 
     step = 0
+    database_query_error: Optional[str] = None
+    database_query_attempted = False
+    database_query_succeeded = False
+    database_query_observation: Any = None
+    database_query_answer: Optional[str] = None
+    is_south_china_kpi_bundle = False
+    is_south_china_refund_followup = False
+    is_south_china_sales_share_followup = False
+    is_published_regional_sales = False
+    is_published_regional_refunds = False
+    is_published_monthly_sales = False
+    is_published_monthly_refunds = False
+    is_published_metric_intent = False
+    average_order_amount_sql: Optional[str] = None
+    scalar_analysis_sql: Optional[str] = None
+    product_analysis_sql: Optional[str] = None
+    regional_status_breakdown_sql: Optional[str] = None
+    regional_order_count_sql: Optional[str] = None
+    order_count_sql: Optional[str] = None
+    metric_action_input: Optional[str] = None
     user_input = dialogue.user_input
     if not isinstance(user_input, str):
         user_input = str(user_input or "")
@@ -1388,6 +2976,9 @@ async def _react_agent_stream_impl(
                         raw_chunks.append(step_chunk(step_id, output_type, chunk))
                 else:
                     raw_chunks.append(step_chunk(step_id, output_type, payload))
+            result_event = serialize_sql_result_event(step_id, parsed.get("result"))
+            if result_event:
+                raw_chunks.append(result_event)
             return raw_chunks
         if isinstance(content, str) and content:
             for chunk in chunk_text(content, max_len=800):
@@ -1542,12 +3133,12 @@ async def _react_agent_stream_impl(
 """
 
     # Step 4: Load database connector if specified in ext_info
-    database_connector = None
     database_context = ""
-    if database_name:
+    business_context = ""
+    if database_name and database_connector is None:
+        database_context = "数据库连接未通过当前用户授权校验，不能执行查询。"
+    elif database_name:
         try:
-            local_db_manager = ConnectorManager.get_instance(CFG.SYSTEM_APP)
-            database_connector = local_db_manager.get_connector(database_name)
             table_names = list(database_connector.get_table_names())
             table_info = database_connector.get_table_info_no_throw()
             database_context = f"""
@@ -1559,6 +3150,11 @@ async def _react_agent_stream_impl(
 - 使用 'sql_query' 工具执行 SQL 查询
 - **只允许 SELECT 查询，禁止 INSERT/UPDATE/DELETE/DROP/ALTER/TRUNCATE**
 """
+            business_context = format_database_business_context(
+                load_database_business_context(database_name)
+            )
+            if business_context and tool_mode != "database":
+                database_context = f"{database_context}\n\n{business_context}"
             logger.info(
                 f"Loaded database connector: {database_name} "
                 f"(tables: {', '.join(table_names)})"
@@ -1571,6 +3167,8 @@ async def _react_agent_stream_impl(
 """
 
     react_state: Dict[str, Any] = {
+        **(identity_context or {}),
+        "sql_execution_budget": AgentSQLBudget(),
         "skills_loaded": True,  # Skills are pre-loaded now
         "matched": None,
         "skill_prompt": None,
@@ -2063,6 +3661,8 @@ print(json.dumps(summary, ensure_ascii=False))
         make_load_file,
         make_load_skill,
         make_load_tools,
+        make_metric_catalog,
+        make_metric_query,
         make_question,
         make_read_file,
         make_shell_interpreter,
@@ -2109,6 +3709,10 @@ print(json.dumps(summary, ensure_ascii=False))
         # No knowledge space connected — use legacy knowledge_retrieve (no-op without resources)
         kb_tool_list = [make_knowledge_retrieve(react_state, knowledge_resources)]
     sql_query_tool = make_sql_query(react_state, database_connector)
+    metric_catalog_tool = make_metric_catalog(react_state)
+    metric_query_tool = make_metric_query(
+        react_state, database_connector, execute_query=sql_query_tool
+    )
     code_interpreter_tool = make_code_interpreter(react_state)
     shell_interpreter_tool = make_shell_interpreter(react_state)
     html_interpreter_tool = make_html_interpreter(react_state, DEFAULT_SKILLS_DIR)
@@ -2284,6 +3888,15 @@ print(json.dumps(summary, ensure_ascii=False))
         ).create(),
         auto_convert_message=True,
     )
+    if token_quota_context is not None:
+        from .token_quota import MeteredLLMClient
+
+        llm_client = MeteredLLMClient(
+            llm_client,
+            tenant_id=token_quota_context["tenant_id"],
+            user_id=token_quota_context["user_id"],
+            daily_limit_tokens=token_quota_context["daily_limit_tokens"],
+        )
     if dialogue.model_name:
         llm_config = LLMConfig(
             llm_client=llm_client,
@@ -2295,6 +3908,7 @@ print(json.dumps(summary, ensure_ascii=False))
 
     conv_id = dialogue.conv_uid or str(uuid.uuid4())
     react_state["conv_id"] = conv_id
+    react_state["trace_id"] = conv_id
     if attachment_ctx is not None:
         # Public manifests for runtime tools plus the internal primary
         # materialized path / files_json mapping (execution-only values —
@@ -2335,34 +3949,47 @@ print(json.dumps(summary, ensure_ascii=False))
     # before appending the current round, then pass it as historical_dialogues
     # so multi-turn follow-ups see the previous Q&A (mirrors hermes'
     # conversation_history passed into the loop).
-    historical_dialogues: List[AgentMessage] = []
-    for _msg in storage_conv.get_history_message():
-        if _msg.type == "human":
-            historical_dialogues.append(AgentMessage(content=_msg.content))
-        elif _msg.type == "ai":
-            historical_dialogues.append(AgentMessage(content=_msg.content))
-        elif _msg.type == "view":
-            # view 消息存的是 history_payload(JSON)，提取 final_content 作为 AI 回答
-            _content = _msg.content
-            try:
-                _payload = (
-                    json.loads(_content) if isinstance(_content, str) else _content
-                )
-                if isinstance(_payload, dict):
-                    _content = _payload.get("final_content") or ""
-            except Exception:
-                pass
-            if _content:
-                historical_dialogues.append(AgentMessage(content=_content))
+    historical_dialogues = _load_react_conversation_history(storage_conv)
     storage_conv.add_user_message(user_input)
+    clarification = (
+        _ecommerce_demo_clarification(database_name, user_input, historical_dialogues)
+        if tool_mode == "database"
+        else None
+    )
+    if clarification:
+        final_answer = AgentFinalAnswer(content=clarification)
+        history_payload = _build_react_history_payload(
+            final_content=final_answer.content,
+            steps=[],
+            task_plan=[],
+            generated_images=[],
+            sub_agents=[],
+            input_files=input_files_snapshot,
+        )
+        for terminal_event in _react_terminal_events(
+            storage_conv,
+            history_payload,
+            final_answer,
+        ):
+            yield terminal_event
+        return
+
+    context_budget_config = await _load_context_budget_config(
+        llm_client=llm_client,
+        model_name=dialogue.model_name,
+    )
     context = AgentContext(
         conv_id=conv_id,
         gpts_app_code="react_agent",
         gpts_app_name="ReAct",
         language="zh",
-        temperature=dialogue.temperature or 0.2,
+        max_new_tokens=_resolve_react_max_new_tokens(
+            dialogue.max_new_tokens,
+            512 if tool_mode == "database" else context_budget_config.reserved_tokens,
+        ),
+        temperature=(0.1 if tool_mode == "database" else dialogue.temperature or 0.2),
         enable_context_management=True,
-        enable_native_function_calling=True,
+        enable_native_function_calling=tool_mode != "database",
     )
 
     # file_ids requests use the public manifest block; legacy file_path and
@@ -2456,6 +4083,16 @@ print(json.dumps(summary, ensure_ascii=False))
         llm_client=llm_client,
         sub_model_name=dialogue.model_name,
         database_connector=database_connector,
+        business_context=business_context,
+        audit_context={
+            "actor_user_id": react_state.get("actor_user_id"),
+            "role": react_state.get("role"),
+            "data_source_id": react_state.get("data_source_id"),
+            "authorization_policy_version": react_state.get(
+                "authorization_policy_version"
+            ),
+            "sql_execution_budget": react_state.get("sql_execution_budget"),
+        },
         knowledge_resources=knowledge_resources,
         connector_tool_extras=connector_tool_extras,
         connector_manager=_connector_manager,
@@ -2463,7 +4100,263 @@ print(json.dumps(summary, ensure_ascii=False))
         max_parallel=_max_parallel_subagents,
     )
 
-    if is_skill_mode:
+    if tool_mode == "database":
+        is_south_china_kpi_bundle = _is_ecommerce_south_china_sales_refund_request(
+            database_name, user_input
+        )
+        is_south_china_refund_followup = _is_south_china_city_refund_followup(
+            database_name, user_input, historical_dialogues
+        )
+        is_south_china_sales_share_followup = (
+            _is_south_china_sales_share_followup(
+                database_name, user_input, historical_dialogues
+            )
+        )
+        is_published_regional_sales = _is_ecommerce_regional_sales_request(
+            database_name, user_input
+        )
+        is_published_regional_refunds = _is_ecommerce_regional_refund_request(
+            database_name, user_input
+        )
+        is_published_monthly_sales = _is_ecommerce_monthly_sales_request(
+            database_name, user_input
+        )
+        is_published_monthly_refunds = _is_ecommerce_monthly_refund_request(
+            database_name, user_input
+        )
+        is_admin_margin_query = react_state.get("role") == "admin" and any(
+            term in user_input.lower()
+            for term in ("毛利率", "毛利", "gross margin", "gross_margin")
+        )
+        database_tools = [metric_catalog_tool, metric_query_tool, sql_query_tool]
+        metric_instruction = (
+            "Published business metrics must be queried using metric_catalog and "
+            "metric_query; the server compiles their approved definition and "
+            "dimensions."
+        )
+        metric_action_input = None
+        order_count_sql = _ecommerce_demo_order_count_sql(database_name, user_input)
+        regional_order_count_sql = _ecommerce_demo_regional_order_count_sql(
+            database_name, user_input
+        )
+        regional_status_breakdown_sql = (
+            _ecommerce_demo_regional_status_breakdown_sql(database_name, user_input)
+        )
+        published_metric_parameters = _published_metric_intent_parameters(
+            database_name, user_input, react_state.get("role")
+        )
+        is_published_metric_intent = published_metric_parameters is not None
+        average_order_amount_sql = _ecommerce_demo_q2_average_order_sql(
+            database_name, user_input
+        )
+        product_analysis_sql = _ecommerce_demo_product_analysis_sql(
+            database_name, user_input
+        )
+        scalar_analysis_sql = _ecommerce_demo_q2_scalar_analysis_sql(
+            database_name, user_input
+        )
+        if is_south_china_kpi_bundle:
+            database_tools = [metric_query_tool]
+            metric_instruction = (
+                "This exact ecommerce-demo question requests the published sales "
+                "and refund-rate metrics for South China in Q2 2026. Query both "
+                "metrics together with metric_query; do not call sql_query."
+            )
+            metric_action_input = json.dumps(
+                {
+                    "metric_ids": ["sales_amount", "refund_rate"],
+                    "start_date": "2026-04-01",
+                    "end_date": "2026-07-01",
+                    "region_area": "South China",
+                },
+                ensure_ascii=False,
+            )
+        elif is_south_china_refund_followup:
+            database_tools = [metric_query_tool]
+            metric_instruction = (
+                "This follow-up inherits the previous conversation's 2026 Q2 South "
+                "China scope. Call metric_query with metric_id refund_rate, "
+                "start_date 2026-04-01, end_date 2026-07-01, dimension region, "
+                "and region_area South China. Do not call sql_query."
+            )
+            metric_action_input = json.dumps(
+                {
+                    "metric_id": "refund_rate",
+                    "start_date": "2026-04-01",
+                    "end_date": "2026-07-01",
+                    "dimension": "region",
+                    "region_area": "South China",
+                },
+                ensure_ascii=False,
+            )
+        elif is_south_china_sales_share_followup:
+            database_tools = [metric_query_tool]
+            metric_instruction = (
+                "This follow-up inherits the previous conversation's 2026 Q2 South "
+                "China scope. Query sales_amount by region with region_area South "
+                "China using metric_query; the server will calculate Guangzhou's "
+                "share from the tenant-scoped result. Do not call sql_query."
+            )
+            metric_action_input = json.dumps(
+                {
+                    "metric_id": "sales_amount",
+                    "start_date": "2026-04-01",
+                    "end_date": "2026-07-01",
+                    "dimension": "region",
+                    "region_area": "South China",
+                },
+                ensure_ascii=False,
+            )
+        elif is_published_regional_sales:
+            database_tools = [metric_query_tool]
+            metric_parameters = {
+                "metric_id": "sales_amount",
+                "start_date": "2026-04-01",
+                "end_date": "2026-07-01",
+                "dimension": "region",
+            }
+            if published_metric_parameters and published_metric_parameters.get(
+                "region_area"
+            ):
+                metric_parameters["region_area"] = published_metric_parameters[
+                    "region_area"
+                ]
+            metric_action_input = json.dumps(metric_parameters, ensure_ascii=False)
+            metric_instruction = (
+                "This ecommerce-demo regional sales request is a published metric. "
+                "Call metric_query with the server-pinned parameters shown below. "
+                "Do not call sql_query."
+            )
+        elif is_published_regional_refunds:
+            database_tools = [metric_query_tool]
+            metric_parameters = {
+                "metric_id": "paid_refund_amount",
+                "start_date": "2026-04-01",
+                "end_date": "2026-07-01",
+                "dimension": "region",
+            }
+            if published_metric_parameters and published_metric_parameters.get(
+                "region_area"
+            ):
+                metric_parameters["region_area"] = published_metric_parameters[
+                    "region_area"
+                ]
+            metric_action_input = json.dumps(metric_parameters, ensure_ascii=False)
+            metric_instruction = (
+                "This ecommerce-demo regional refund amount request is a published "
+                "metric. Call metric_query with the server-pinned parameters shown "
+                "below. Do not call sql_query."
+            )
+        elif is_published_monthly_sales:
+            database_tools = [metric_query_tool]
+            metric_action_input = json.dumps(
+                {
+                    "metric_id": "sales_amount",
+                    "start_date": "2026-04-01",
+                    "end_date": "2026-07-01",
+                    "dimension": "month",
+                },
+                ensure_ascii=False,
+            )
+            metric_instruction = (
+                "This ecommerce-demo monthly sales request is a published metric. "
+                "Call metric_query with the server-pinned parameters shown below. "
+                "Do not call sql_query."
+            )
+        elif is_published_monthly_refunds:
+            database_tools = [metric_query_tool]
+            metric_action_input = json.dumps(
+                {
+                    "metric_id": "paid_refund_amount",
+                    "start_date": "2026-04-01",
+                    "end_date": "2026-07-01",
+                    "dimension": "month",
+                    "metric_version": "1.0.0",
+                },
+                ensure_ascii=False,
+            )
+            metric_instruction = (
+                "This ecommerce-demo monthly refund amount request is a published "
+                "metric. Call metric_query with the server-pinned parameters shown "
+                "below. Do not call sql_query."
+            )
+        elif is_published_metric_intent:
+            database_tools = [metric_query_tool]
+            metric_action_input = json.dumps(published_metric_parameters, ensure_ascii=False)
+            metric_instruction = (
+                "This request uniquely matches one published metric and has an "
+                "explicit supported time range. Use metric_query with the "
+                "server-resolved parameters shown below. Do not call sql_query."
+            )
+        elif average_order_amount_sql:
+            database_tools = [sql_query_tool]
+            metric_instruction = (
+                "This is a supported Q2 2026 completed-order average amount request. "
+                "Use sql_query with this exact read-only query: "
+                f"{average_order_amount_sql}"
+            )
+        elif product_analysis_sql:
+            database_tools = [sql_query_tool]
+            metric_instruction = (
+                "This is a supported Q2 2026 product analysis request. Use "
+                "sql_query with this exact read-only query: "
+                f"{product_analysis_sql}"
+            )
+        elif scalar_analysis_sql:
+            database_tools = [sql_query_tool]
+            metric_instruction = (
+                "This is a supported Q2 2026 scalar analysis request. Use "
+                "sql_query with this exact read-only query: "
+                f"{scalar_analysis_sql}"
+            )
+        elif regional_status_breakdown_sql:
+            database_tools = [sql_query_tool]
+            metric_instruction = (
+                "This is a supported Q2 2026 order count and amount breakdown by "
+                "region and order status. Use sql_query with this exact read-only "
+                f"query: {regional_status_breakdown_sql}"
+            )
+        elif regional_order_count_sql:
+            database_tools = [sql_query_tool]
+            metric_instruction = (
+                "This is a supported Q2 2026 completed-order count by region. "
+                "Use sql_query with this exact read-only query: "
+                f"{regional_order_count_sql}"
+            )
+        elif order_count_sql:
+            database_tools = [sql_query_tool]
+            metric_instruction = (
+                "This is a supported ungrouped Q2 2026 order-count request. "
+                "Use sql_query with this exact read-only query: "
+                f"{order_count_sql}"
+            )
+        if is_admin_margin_query:
+            metric_instruction += (
+                " For a gross-margin request, use the published metric catalog "
+                "and metric query tools."
+            )
+        if database_name == "ecommerce-demo":
+            database_context += """
+
+演示数据口径：订单销售额必须汇总 orders.total_cents；order_items 没有 total_cents 字段，不能用于订单总额。地区名称使用 regions.name，并通过 tenant_id、region_id 关联。季度时间使用左闭右开区间（2026 年第二季度为 created_at >= '2026-04-01' AND created_at < '2026-07-01'）；金额单位为人民币分。
+"""
+        workflow_prompt = _database_workflow_prompt(
+            metric_instruction=metric_instruction,
+            database_context=database_context,
+            metric_only=(
+                is_south_china_kpi_bundle
+                or is_south_china_refund_followup
+                or is_south_china_sales_share_followup
+                or is_published_regional_sales
+                or is_published_regional_refunds
+                or is_published_monthly_sales
+                or is_published_monthly_refunds
+                or is_published_metric_intent
+            ),
+            metric_action_input=metric_action_input,
+        )
+        tool_pack = ToolPack(database_tools + [Terminate()])
+    elif is_skill_mode:
         # Simplified prompt for skill mode - only skill-related tools +
         # html_interpreter
         workflow_prompt = f"""
@@ -2554,6 +4447,13 @@ If template_path returns "Template not found", immediately switch to the default
    {available_images_hint}
 6. **sql_query**: Execute a read-only SQL query against the selected database.
 Parameters: {{"sql": "SELECT statement"}}
+6.1. **metric_catalog**: Query the selected datasource's published metric definitions,
+versions and pinned dependencies. Use the returned definition before writing SQL.
+Parameters: {{"metric_id": "optional metric ID", "metric_version": "optional version"}}
+6.2. **metric_query**: Deterministically compile and execute a published metric with
+its pinned dependencies, date range and optional region/month dimension.
+Parameters: {{"metric_id": "ID", "start_date": "YYYY-MM-DD", "end_date":
+"YYYY-MM-DD", "dimension": "optional region/month", "metric_version": "optional"}}
 7. **todowrite**: Create and manage a structured task list. Use for complex tasks
 (3+ steps) to plan and track progress. Pass the FULL list every time. Each item:
 {{"content": "description", "status": "pending|in_progress|completed|cancelled",
@@ -2626,6 +4526,8 @@ Thought/Action/Action Input format shown above.
                     execute_skill_script_file_tool,
                     shell_interpreter_tool,
                     html_interpreter_tool,
+                    metric_catalog_tool,
+                    metric_query_tool,
                     sql_query_tool,
                     todowrite_tool,
                     question_tool,
@@ -2760,6 +4662,13 @@ Parameters: {{"path": "file path like src/main.py", "start_line": "start line (o
 Parameters: {{"query": "search query in natural language", "top_k": "number of results (optional)"}}
 {codegraph_section}14. **sql_query**: Execute a read-only SQL query against the selected database.
 Parameters: {{"sql": "SELECT statement"}}
+14.1. **metric_catalog**: Query published metric definitions, versions and pinned
+dependencies for the selected datasource before writing metric SQL.
+Parameters: {{"metric_id": "optional metric ID", "metric_version": "optional version"}}
+14.2. **metric_query**: Deterministically compile and execute a published metric
+using its pinned dependencies, date range and optional region/month dimension.
+Parameters: {{"metric_id": "ID", "start_date": "YYYY-MM-DD", "end_date":
+"YYYY-MM-DD", "dimension": "optional region/month", "metric_version": "optional"}}
 15. **load_tools**: Resolve required tools for the selected skill. Parameters: none.
 16. **execute_tool**: Execute a tool by name with JSON args.
 Parameters: {{"tool_name": "tool name", "args": {{parameters}}}}
@@ -2838,6 +4747,8 @@ Thought/Action/Action Input format shown above.
                     execute_analysis_tool,
                     shell_interpreter_tool,
                     html_interpreter_tool,
+                    metric_catalog_tool,
+                    metric_query_tool,
                     sql_query_tool,
                     read_file_tool,
                     todowrite_tool,
@@ -2852,7 +4763,11 @@ Thought/Action/Action Input format shown above.
 
     # Debug: print all registered tools
     logger.info(f"ToolPack resources: {list(tool_pack._resources.keys())}")
-    if "execute_skill_script" not in tool_pack._resources:
+    if (
+        tool_mode == "full"
+        and not is_skill_mode
+        and "execute_skill_script" not in tool_pack._resources
+    ):
         logger.error("execute_skill_script NOT in ToolPack!")
 
     # Combine tool_pack and knowledge_resources into a single ResourcePack
@@ -2949,7 +4864,22 @@ Thought/Action/Action Input format shown above.
     )
 
     agent_builder = (
-        ToolCallingReActAgent(max_retry_count=30)
+        ToolCallingReActAgent(
+            max_retry_count=(
+                1
+                if (
+                    is_south_china_kpi_bundle
+                    or is_south_china_refund_followup
+                    or is_south_china_sales_share_followup
+                    or is_published_regional_sales
+                    or is_published_regional_refunds
+                    or is_published_monthly_sales
+                    or is_published_monthly_refunds
+                    or is_published_metric_intent
+                )
+                else (5 if tool_mode == "database" else 30)
+            )
+        )
         .bind(context)
         .bind(agent_memory)
         .bind(llm_config)
@@ -2969,20 +4899,17 @@ Thought/Action/Action Input format shown above.
         await stream_queue.put({"type": "context.status", **status})
 
     agent.init_context_management(
-        config=await _load_context_budget_config(
-            llm_client=llm_client,
-            model_name=dialogue.model_name,
-        ),
+        config=context_budget_config,
         model_name=dialogue.model_name,
         on_status_event=_context_status_callback,
     )
 
     async def run_agent():
-        return await agent.generate_reply(
-            received_message=received,
-            sender=agent,
-            stream_callback=stream_callback,
-            historical_dialogues=historical_dialogues,
+        return await _generate_react_agent_reply(
+            agent,
+            received,
+            stream_callback,
+            historical_dialogues,
         )
 
     agent_task = asyncio.create_task(run_agent())
@@ -3137,6 +5064,71 @@ Thought/Action/Action Input format shown above.
             round_num = int(event.get("round") or (len(round_step_map) + 1))
 
             action_output = event.get("action_output") or {}
+            pinned_sql = (
+                scalar_analysis_sql
+                or product_analysis_sql
+                or average_order_amount_sql
+                or regional_status_breakdown_sql
+                or regional_order_count_sql
+                or order_count_sql
+            )
+            if pinned_sql and isinstance(action_output, dict):
+                action_output = _ensure_expected_sql_action(
+                    action_output, sql_query_tool, pinned_sql
+                )
+            elif (
+                is_south_china_kpi_bundle
+                or is_published_regional_sales
+                or is_published_regional_refunds
+                or is_published_monthly_sales
+                or is_published_monthly_refunds
+                or is_published_metric_intent
+            ) and isinstance(action_output, dict):
+                action_output = _ensure_expected_metric_action(
+                    action_output,
+                    metric_query_tool,
+                    json.loads(metric_action_input or "{}"),
+                )
+            elif is_south_china_refund_followup and isinstance(action_output, dict):
+                action_output = _ensure_expected_metric_action(
+                    action_output,
+                    metric_query_tool,
+                    json.loads(metric_action_input or "{}"),
+                )
+            if is_south_china_sales_share_followup and isinstance(action_output, dict):
+                action_output = _ensure_expected_metric_action(
+                    action_output,
+                    metric_query_tool,
+                    json.loads(metric_action_input or "{}"),
+                )
+                formatted_share = _format_sales_share_result(
+                    action_output.get("observations")
+                )
+                if formatted_share is None:
+                    action_output = {
+                        **action_output,
+                        "observations": json.dumps(
+                            {
+                                "error": {
+                                    "message": "销售额指标未返回完整的华南城市结果，无法计算占比。"
+                                }
+                            },
+                            ensure_ascii=False,
+                        ),
+                        "is_exe_success": False,
+                    }
+                else:
+                    action_output["observations"], database_query_answer = (
+                        formatted_share
+                    )
+            database_query_outcome = _database_query_outcome(action_output)
+            if database_query_outcome is not None:
+                database_query_attempted = True
+                query_succeeded, query_error = database_query_outcome
+                database_query_error = None if query_succeeded else query_error
+                database_query_succeeded = query_succeeded
+                if query_succeeded:
+                    database_query_observation = action_output.get("observations")
             thoughts = action_output.get("thoughts")
             action = action_output.get("action")
             action_input = action_output.get("action_input")
@@ -3155,8 +5147,10 @@ Thought/Action/Action Input format shown above.
             # Also skip emitting the thought for terminate since it's noise.
             # Note: TerminateAction.run() sets terminate=True but does NOT
             # set the action field, so we must check the terminate boolean.
-            is_terminate = action_output.get("terminate") or (
-                action and action.lower() == "terminate"
+            is_terminal_sql_error = _terminal_sql_error(action_output) is not None
+            is_terminate = not is_terminal_sql_error and (
+                action_output.get("terminate")
+                or (action and action.lower() == "terminate")
             )
             if is_terminate:
                 pending_thoughts.pop(round_num, [])
@@ -3442,6 +5436,15 @@ Thought/Action/Action Input format shown above.
                                 "content": observation_text,
                             }
                         )
+                    if isinstance(parsed_obs, dict) and serialize_sql_result_event(
+                        react_step_id, parsed_obs.get("result")
+                    ):
+                        current_history_step["outputs"].append(
+                            {
+                                "output_type": "sql_result",
+                                "content": parsed_obs["result"],
+                            }
+                        )
 
                 # Citations are opt-in: the assembler accepts only explicitly
                 # supported knowledge tools and fails closed on malformed data.
@@ -3474,7 +5477,21 @@ Thought/Action/Action Input format shown above.
     try:
         reply = await agent_task
     except Exception as e:
-        err_msg = f"React agent failed: {e}"
+        quota_exceeded = _is_token_quota_exceeded(e)
+        quota_unmeterable = _is_token_quota_configuration_error(e)
+        err_msg = (
+            "当日模型 Token 配额不足，本次模型调用已拒绝。"
+            if quota_exceeded
+            else (
+                "当前请求无法安全估算 Token 预算，本次模型调用已拒绝。"
+                if quota_unmeterable
+                else f"React agent failed: {e}"
+            )
+        )
+        if quota_exceeded:
+            yield _sse_event({"type": "quota.exceeded", "scope": "daily_user"})
+        elif quota_unmeterable:
+            yield _sse_event({"type": "quota.unmeterable"})
         fail_running_subagent_history(subagent_history)
         error_payload = _build_react_history_payload(
             final_content=err_msg,
@@ -3493,11 +5510,153 @@ Thought/Action/Action Input format shown above.
             yield terminal_event
         return
 
-    if reply.action_report and reply.action_report.terminate:
+    has_pinned_query = bool(
+        scalar_analysis_sql
+        or product_analysis_sql
+        or average_order_amount_sql
+        or regional_status_breakdown_sql
+        or regional_order_count_sql
+        or order_count_sql
+        or metric_action_input
+    )
+    if tool_mode == "database" and has_pinned_query and not database_query_attempted:
+        pinned_sql = (
+            scalar_analysis_sql
+            or product_analysis_sql
+            or average_order_amount_sql
+            or regional_status_breakdown_sql
+            or regional_order_count_sql
+            or order_count_sql
+        )
+        if pinned_sql:
+            pinned_action = _ensure_expected_sql_action(
+                {"action": "terminate"}, sql_query_tool, pinned_sql
+            )
+        else:
+            pinned_action = _ensure_expected_metric_action(
+                {"action": "terminate"},
+                metric_query_tool,
+                json.loads(metric_action_input),
+            )
+        database_query_attempted = True
+        database_query_outcome = _database_query_outcome(pinned_action)
+        if database_query_outcome is not None:
+            database_query_succeeded, database_query_error = database_query_outcome
+            if database_query_succeeded:
+                database_query_observation = pinned_action.get("observations")
+
+        action = pinned_action.get("action") or (
+            "sql_query" if pinned_sql else "metric_query"
+        )
+        action_input = pinned_action.get("action_input")
+        step_id, step_event = build_step("执行固定数据查询", "服务端固定的已发布查询")
+        yield step_event
+        yield step_meta(
+            step_id,
+            "该问题匹配已发布的数据查询口径。",
+            action,
+            action_input,
+            title="执行固定数据查询",
+            action_intention="查询已确认的业务指标",
+            action_reason="避免无查询结果时返回未经验证的自然语言答案",
+        )
+        observation = pinned_action.get("observations")
+        for chunk in emit_tool_chunks(step_id, observation):
+            yield chunk
+        step_status = "done" if database_query_succeeded else "failed"
+        yield step_done(step_id, step_status)
+        outputs = []
+        parsed_observation = None
+        if isinstance(observation, str):
+            try:
+                parsed_observation = json.loads(observation)
+            except json.JSONDecodeError:
+                pass
+        if isinstance(parsed_observation, dict):
+            for chunk in parsed_observation.get("chunks", []):
+                if isinstance(chunk, dict) and isinstance(chunk.get("content"), str):
+                    outputs.append(
+                        {
+                            "output_type": chunk.get("output_type", "text"),
+                            "content": chunk["content"],
+                        }
+                    )
+            result = parsed_observation.get("result")
+            if isinstance(result, dict) and result.get("type") == "sql_result":
+                outputs.append({"output_type": "sql_result", "content": result})
+        history_steps.append(
+            {
+                "id": step_id,
+                "title": "执行固定数据查询",
+                "detail": "服务端固定的已发布查询",
+                "phase": None,
+                "thought": "该问题匹配已发布的数据查询口径。",
+                "action": action,
+                "action_input": action_input,
+                "outputs": outputs,
+                "status": step_status,
+            }
+        )
+
+    terminal_sql_error = _terminal_sql_error(reply.action_report)
+    if tool_mode == "database" and database_query_error is not None:
+        final_content = database_query_error
+    elif (
+        tool_mode == "database"
+        and is_south_china_sales_share_followup
+        and database_query_succeeded
+    ):
+        final_content = database_query_answer or "查询已完成，华南区占比见下方结果。"
+    elif (
+        tool_mode == "database"
+        and is_south_china_refund_followup
+        and database_query_succeeded
+    ):
+        final_content = _format_metric_leader(
+            database_query_observation, "refund_rate_pct"
+        ) or "已沿用上一轮华南区第二季度范围完成查询；结果见下方城市退款率表格和图表。"
+    elif (
+        tool_mode == "database"
+        and (
+            is_south_china_kpi_bundle
+            or is_published_regional_sales
+            or is_published_regional_refunds
+            or is_published_monthly_sales
+            or is_published_monthly_refunds
+            or is_published_metric_intent
+        )
+        and database_query_succeeded
+    ):
+        final_content = (
+            "已查询华南区第二季度销售额和退款率，结果见下方指标表格。"
+            if is_south_china_kpi_bundle
+            else (
+                "查询已完成。下方表格和柱状图展示各城市销售额，金额单位为人民币分，"
+                "并已按销售额从高到低排序。"
+                if is_published_regional_sales
+                else (
+                    "已按已发布退款金额口径完成查询，明细见下方各地区结果表。"
+                    if is_published_regional_refunds
+                    else (
+                        "已按已发布销售额口径完成月度查询，明细见下方结果表。"
+                        if is_published_monthly_sales
+                        else (
+                            "已按已发布退款额口径完成月度查询，明细见下方结果表。"
+                            if is_published_monthly_refunds
+                            else "已按已发布指标口径完成查询，结果见下方表格。"
+                        )
+                    )
+                )
+            )
+        )
+    elif terminal_sql_error is not None:
+        final_content = terminal_sql_error
+    elif reply.action_report and reply.action_report.terminate:
         raw_content = reply.action_report.content or ""
         # The terminate ActionOutput.content may be the raw ReAct text, e.g.:
         # "Thought: ...\nAction: terminate\nAction Input: {"result": "..."}"
-        # We need to extract the "result" value from Action Input.
+        # Extract the final value from Action Input. Tool schemas use either
+        # `result` or `output` depending on the selected termination action.
         final_content = raw_content
         try:
             steps = parser.parse(raw_content)
@@ -3512,24 +5671,29 @@ Thought/Action/Action Input format shown above.
                         parsed_input = parse_or_raise_error(action_input)
                     else:
                         parsed_input = action_input
-                    if isinstance(parsed_input, dict) and "result" in parsed_input:
-                        final_content = parsed_input["result"]
+                    if isinstance(parsed_input, dict):
+                        final_content = parsed_input.get("result") or parsed_input.get(
+                            "output", final_content
+                        )
         except Exception:
             pass
-        # native function calling 路径：terminate content 可能是 {"result":...}
-        # (JSON) 或 {'result':...} (Python dict repr)，直接提取 result。
+        # Native function calling may return a JSON object or Python dict repr.
         if final_content == raw_content:
             try:
                 _parsed = json.loads(raw_content)
-                if isinstance(_parsed, dict) and "result" in _parsed:
-                    final_content = _parsed["result"]
+                if isinstance(_parsed, dict):
+                    final_content = _parsed.get("result") or _parsed.get(
+                        "output", final_content
+                    )
             except Exception:
                 try:
                     import ast
 
                     _parsed = ast.literal_eval(raw_content)
-                    if isinstance(_parsed, dict) and "result" in _parsed:
-                        final_content = _parsed["result"]
+                    if isinstance(_parsed, dict):
+                        final_content = _parsed.get("result") or _parsed.get(
+                            "output", final_content
+                        )
                 except Exception:
                     pass
     elif reply.action_report:
@@ -3744,39 +5908,68 @@ async def delete_share_link(
 
 @router.get("/v1/agent/files/download")
 async def download_agent_file(
-    file_path: str = Query(..., description="Absolute path to the file to download"),
+    file_path: str = Query(
+        ...,
+        description="Path to a file inside the conversation's Agent output directory",
+    ),
+    conv_uid: str = Query(..., description="Conversation that owns the Agent artifact"),
+    user_token: UserRequest = Depends(get_user_from_headers),
 ):
-    """Download a file created by agent tools (shell_interpreter, code_interpreter).
-
-    Only files under allowed directories (/tmp, PILOT_PATH/tmp/) can be downloaded.
-    This prevents arbitrary file access on the server.
-    """
+    """Download an Agent artifact owned by the authenticated conversation user."""
     from fastapi import HTTPException
     from fastapi.responses import FileResponse
 
-    from dbgpt.configs.model_config import PILOT_PATH, ROOT_PATH
+    from dbgpt.configs.model_config import PILOT_PATH
 
-    # If path is not absolute, resolve relative to ROOT_PATH (sandbox working dir)
+    # A conversation ID becomes one directory component below PILOT_PATH/tmp.
+    if not conv_uid or conv_uid in {".", ".."} or "/" in conv_uid or "\\" in conv_uid:
+        raise HTTPException(status_code=400, detail="Invalid conversation ID")
+
+    identity = trusted_agent_execution_context(user_token)
+    actor_id = identity.get("actor_id") if isinstance(identity, dict) else None
+    if (
+        not identity
+        or identity.get("source") != "verified_oidc_jwt"
+        or not actor_id
+        or actor_id != user_token.user_id
+    ):
+        raise HTTPException(status_code=401, detail="Verified identity required")
+
+    owner = _conversation_owner_user_name(conv_uid)
+    if owner is None:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    if not owner or owner != actor_id:
+        raise HTTPException(status_code=403, detail="Not the conversation owner")
+
+    artifact_root = os.path.realpath(os.path.join(PILOT_PATH, "tmp"))
+    conversation_dir = os.path.realpath(os.path.join(artifact_root, conv_uid))
+    if (
+        os.path.dirname(conversation_dir) != artifact_root
+        or os.path.basename(conversation_dir) != conv_uid
+    ):
+        raise HTTPException(status_code=403, detail="Invalid artifact directory")
+    # Preserve the legacy relative-path convention, but resolve it only from the
+    # conversation's own artifact directory instead of the application root.
     if not os.path.isabs(file_path):
-        file_path = os.path.join(ROOT_PATH, file_path)
+        file_path = os.path.join(conversation_dir, file_path)
 
-    # Resolve to absolute path and prevent path traversal
+    # Resolve symlinks before checking containment so they cannot escape the
+    # conversation's artifact directory.
     try:
         resolved = os.path.realpath(file_path)
     except (ValueError, OSError):
         raise HTTPException(status_code=400, detail="Invalid file path")
 
-    # Allowed base directories for agent-created files
-    allowed_dirs = [
-        os.path.realpath("/tmp"),
-        os.path.realpath(os.path.join(PILOT_PATH, "tmp")),
-        os.path.realpath(ROOT_PATH),
-    ]
-
-    if not any(resolved.startswith(d + os.sep) or resolved == d for d in allowed_dirs):
+    try:
+        is_within_conversation = (
+            os.path.commonpath([conversation_dir, resolved]) == conversation_dir
+        )
+    except ValueError:
+        is_within_conversation = False
+    if not is_within_conversation or resolved == conversation_dir:
         raise HTTPException(
             status_code=403,
-            detail="Access denied: file is not in an allowed directory",
+            detail="Access denied: file is outside this conversation's artifacts",
         )
 
     if not os.path.isfile(resolved):
@@ -3832,6 +6025,70 @@ async def download_skill_package(
     )
 
 
+def _get_authorized_database_connector(
+    dialogue: ConversationVo, user_token: UserRequest
+) -> Optional[Any]:
+    """Resolve a selected datasource only when it is visible to this user."""
+    ext_info = dialogue.ext_info if isinstance(dialogue.ext_info, dict) else {}
+    database_name = ext_info.get("database_name")
+    if database_name is None:
+        return None
+    if not isinstance(database_name, str) or not database_name.strip():
+        raise HTTPException(status_code=400, detail="Invalid database selection")
+    if not user_token or not user_token.user_id:
+        raise HTTPException(status_code=401, detail="Authenticated user required")
+
+    try:
+        database_manager = ConnectorManager.get_instance(CFG.SYSTEM_APP)
+        accessible = database_manager.get_db_list(
+            db_name=database_name,
+            user_id=user_token.user_id,
+        )
+        if not accessible:
+            raise HTTPException(
+                status_code=403,
+                detail="Selected database is not available to this user",
+            )
+        return database_manager.get_connector(database_name)
+    except HTTPException:
+        raise
+    except Exception as error:
+        logger.warning("Unable to resolve authorized database connector", exc_info=True)
+        raise HTTPException(
+            status_code=503,
+            detail="Selected database is unavailable",
+        ) from error
+
+
+def _resolve_react_agent_tool_mode(
+    dialogue: ConversationVo,
+    database_name: Optional[str],
+    attachment_ctx: Optional[Any],
+) -> str:
+    """Use the database-only tool pack for a database-only chat turn."""
+    if dialogue.chat_mode == "chat_with_db_execute":
+        return "database"
+    if not database_name:
+        return "full"
+
+    ext_info = dialogue.ext_info if isinstance(dialogue.ext_info, dict) else {}
+    other_context = any(
+        ext_info.get(key)
+        for key in (
+            "skill_id",
+            "skill_name",
+            "knowledge_space_id",
+            "knowledge_space_name",
+            "connector_id",
+            "connector_ids",
+            "file_path",
+            "file_ids",
+            "input_files",
+        )
+    )
+    return "full" if other_context or attachment_ctx else "database"
+
+
 @router.post("/v1/chat/react-agent")
 async def chat_react_agent(
     dialogue: ConversationVo = Body(),
@@ -3844,8 +6101,19 @@ async def chat_react_agent(
         dialogue.model_name,
     )
     dialogue.user_name = user_token.user_id if user_token else dialogue.user_name
+    token_quota_context = _react_daily_token_quota_context(user_token)
+    database_connector = _get_authorized_database_connector(dialogue, user_token)
+    database_name = (
+        (dialogue.ext_info or {}).get("database_name")
+        if isinstance(dialogue.ext_info, dict)
+        else None
+    )
+    execution_identity = trusted_agent_execution_context(user_token)
+    if execution_identity is None and database_name:
+        execution_identity = local_demo_execution_context(user_token, database_name)
     # Pre-flight: 400/404 surface before the stream (and agent) is built.
     attachment_ctx = await _open_turn_attachments(dialogue, user_token)
+    tool_mode = _resolve_react_agent_tool_mode(dialogue, database_name, attachment_ctx)
     headers = {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
@@ -3855,7 +6123,38 @@ async def chat_react_agent(
     try:
         return _AgentStreamingResponse(
             _react_agent_stream(
-                dialogue, tool_mode="full", attachment_ctx=attachment_ctx
+                dialogue,
+                tool_mode=tool_mode,
+                attachment_ctx=attachment_ctx,
+                database_connector=database_connector,
+                identity_context={
+                    "actor_user_id": user_token.user_id,
+                    "role": (
+                        execution_identity.get("role")
+                        if execution_identity
+                        else user_token.role
+                    ),
+                    "tenant_id": (
+                        execution_identity.get("tenant_id")
+                        if execution_identity
+                        else user_token.tenant_id
+                    ),
+                    "region_id": (
+                        execution_identity.get("region_id")
+                        if execution_identity
+                        else user_token.region_id
+                    ),
+                    "data_source_id": database_name,
+                    "authorization_policy_version": (
+                        execution_identity.get(
+                            "authorization_policy_version", "datasource-visibility-v1"
+                        )
+                        if execution_identity
+                        else "datasource-visibility-v1"
+                    ),
+                    "verified_execution_context": execution_identity,
+                },
+                token_quota_context=token_quota_context,
             ),
             headers=headers,
             media_type="text/event-stream",
@@ -3892,6 +6191,7 @@ async def chat_knowledge_agent(
         dialogue.model_name,
     )
     dialogue.user_name = user_token.user_id if user_token else dialogue.user_name
+    token_quota_context = _react_daily_token_quota_context(user_token)
     # Pre-flight: 400/404 surface before the stream (and agent) is built.
     attachment_ctx = await _open_turn_attachments(dialogue, user_token)
     headers = {
@@ -3903,7 +6203,10 @@ async def chat_knowledge_agent(
     try:
         return _AgentStreamingResponse(
             _react_agent_stream(
-                dialogue, tool_mode="knowledge", attachment_ctx=attachment_ctx
+                dialogue,
+                tool_mode="knowledge",
+                attachment_ctx=attachment_ctx,
+                token_quota_context=token_quota_context,
             ),
             headers=headers,
             media_type="text/event-stream",

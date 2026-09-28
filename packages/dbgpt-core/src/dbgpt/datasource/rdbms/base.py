@@ -2,6 +2,7 @@
 
 import logging
 import re
+import time
 import weakref
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FutureTimeoutError
@@ -33,6 +34,7 @@ from sqlalchemy.orm.session import Session
 from sqlalchemy.schema import CreateTable
 
 from dbgpt.datasource.base import BaseConnector
+from dbgpt.datasource.sql_guard import sql_fingerprint
 from dbgpt.util.i18n_utils import _
 from dbgpt_ext.datasource.schema import DBType
 
@@ -272,7 +274,7 @@ class RDBMSConnector(BaseConnector):
                 session.commit()
         except Exception as e:
             session.rollback()
-            logger.error(f"Error in session scope: {e}")
+            logger.error("Database session operation failed (%s)", type(e).__name__)
             raise
         finally:
             session.close()
@@ -432,7 +434,8 @@ class RDBMSConnector(BaseConnector):
         Args:
             write_sql (str): SQL write command to run
         """
-        logger.info(f"Write[{write_sql}]")
+        fingerprint = sql_fingerprint(write_sql)
+        logger.info("Write query_sha256=%s", fingerprint)
         db_cache = self._engine.url.database
         with self.session_scope(commit=False) as session:
             result = session.execute(text(write_sql))
@@ -440,7 +443,11 @@ class RDBMSConnector(BaseConnector):
             # TODO  Subsequent optimization of dynamically specified database submission
             #  loss target problem
             session.execute(text(f"use `{db_cache}`"))
-            logger.info(f"SQL[{write_sql}], result:{result.rowcount}")
+            logger.info(
+                "Write completed query_sha256=%s rows=%s",
+                fingerprint,
+                result.rowcount,
+            )
             return result.rowcount
 
     def _query(self, query: str, fetch: str = "all"):
@@ -452,7 +459,7 @@ class RDBMSConnector(BaseConnector):
         """
         result: List[Any] = []
 
-        logger.info(f"Query[{query}]")
+        logger.info("Query query_sha256=%s", sql_fingerprint(query))
         if not query:
             return result
         with self.session_scope() as session:
@@ -484,6 +491,46 @@ class RDBMSConnector(BaseConnector):
         params: Optional[Dict[str, Any]] = None,
         fetch: str = "all",
         timeout: Optional[float] = None,
+        verified_execution_context: Optional[Dict[str, Any]] = None,
+    ) -> Tuple[List[str], Optional[List]]:
+        """Execute a SQL command and emit safe execution metadata."""
+        started_at = time.monotonic()
+        fingerprint = sql_fingerprint(query)
+        status = "failed"
+        returned_rows = 0
+        try:
+            columns, rows = self._query_ex(
+                query,
+                params,
+                fetch,
+                timeout,
+                verified_execution_context=verified_execution_context,
+            )
+            status = "succeeded"
+            returned_rows = len(rows or [])
+            return columns, rows
+        except TimeoutError:
+            status = "timeout"
+            raise
+        finally:
+            logger.info(
+                "rdbms_sql_audit dialect=%s query_sha256=%s status=%s "
+                "duration_ms=%s returned_rows=%s timeout_seconds=%s",
+                self.dialect,
+                fingerprint,
+                status,
+                int((time.monotonic() - started_at) * 1000),
+                returned_rows,
+                timeout,
+            )
+
+    def _query_ex(
+        self,
+        query: str,
+        params: Optional[Dict[str, Any]] = None,
+        fetch: str = "all",
+        timeout: Optional[float] = None,
+        verified_execution_context: Optional[Dict[str, Any]] = None,
     ) -> Tuple[List[str], Optional[List]]:
         """Execute a SQL command and return the results with optional timeout.
 
@@ -503,7 +550,6 @@ class RDBMSConnector(BaseConnector):
             SQLAlchemyError: If query execution fails
             TimeoutError: If query exceeds specified timeout
         """
-        logger.info(f"Query[{query}] with timeout={timeout}s")
         if not query:
             return [], None
         query = self._format_sql(query)
@@ -530,8 +576,26 @@ class RDBMSConnector(BaseConnector):
             return [], None
 
         with self.session_scope() as session:
+            sqlite_deadline = None
             try:
                 sql = text(query)
+
+                if self.dialect == "postgresql":
+                    tenant_id = ""
+                    if (
+                        isinstance(verified_execution_context, dict)
+                        and verified_execution_context.get("source")
+                        == "verified_oidc_jwt"
+                    ):
+                        trusted_tenant = verified_execution_context.get("tenant_id")
+                        if isinstance(trusted_tenant, str):
+                            tenant_id = trusted_tenant
+                    session.execute(
+                        text(
+                            "SELECT set_config('app.current_tenant', :tenant_id, true)"
+                        ),
+                        {"tenant_id": tenant_id},
+                    )
 
                 # Handle timeout based on database dialect
                 if timeout is not None:
@@ -544,11 +608,26 @@ class RDBMSConnector(BaseConnector):
                         return _execute_query(session, sql, params)
 
                     elif self.dialect == "postgresql":
-                        # PostgreSQL: Set statement_timeout in milliseconds
+                        # PostgreSQL: Set a transaction-local timeout so aborting
+                        # the query cannot leave a changed session setting in the
+                        # connection pool.
                         session.execute(
-                            text(f"SET statement_timeout = {int(timeout * 1000)}")
+                            text(f"SET LOCAL statement_timeout = {int(timeout * 1000)}")
                         )
                         return _execute_query(session, sql, params)
+
+                    elif self.dialect == "sqlite":
+                        sqlite_deadline = time.monotonic() + timeout
+                        raw_connection = (
+                            session.connection().connection.driver_connection
+                        )
+                        raw_connection.set_progress_handler(
+                            lambda: int(time.monotonic() >= sqlite_deadline), 1000
+                        )
+                        try:
+                            return _execute_query(session, sql, params)
+                        finally:
+                            raw_connection.set_progress_handler(None, 0)
 
                     elif self.dialect == "oceanbase":
                         # OceanBase: Set ob_query_timeout in microseconds
@@ -587,7 +666,14 @@ class RDBMSConnector(BaseConnector):
                 return _execute_query(session, sql, params)
 
             except SQLAlchemyError as e:
-                if "timeout" in str(e).lower() or "timed out" in str(e).lower():
+                if (
+                    "timeout" in str(e).lower()
+                    or "timed out" in str(e).lower()
+                    or (
+                        sqlite_deadline is not None
+                        and time.monotonic() >= sqlite_deadline
+                    )
+                ):
                     raise TimeoutError(f"Query exceeded timeout of {timeout} seconds")
                 raise
             except TimeoutError:
@@ -598,8 +684,6 @@ class RDBMSConnector(BaseConnector):
                     try:
                         if self.dialect == "mysql":
                             session.execute(text("SET SESSION MAX_EXECUTION_TIME = 0"))
-                        elif self.dialect == "postgresql":
-                            session.execute(text("SET statement_timeout = 0"))
                         elif self.dialect == "oceanbase":
                             session.execute(
                                 text("SET SESSION ob_query_timeout = 10000000")
@@ -608,7 +692,8 @@ class RDBMSConnector(BaseConnector):
                         # execution level
                     except Exception as reset_error:
                         logger.warning(
-                            f"Failed to reset timeout settings: {reset_error}"
+                            "Failed to reset timeout settings (%s)",
+                            type(reset_error).__name__,
                         )
 
     def _format_sql(self, sql: str) -> str:
@@ -619,38 +704,58 @@ class RDBMSConnector(BaseConnector):
 
     def run(self, command: str, fetch: str = "all") -> List:
         """Execute a SQL command and return a string representing the results."""
-        logger.info("SQL:" + command)
-        if not command or len(command) < 0:
-            return []
-        parsed, ttype, sql_type, table_name = self.__sql_parse(command)
-        command = self._format_sql(command)
-        if ttype == sqlparse.tokens.DML:
-            if sql_type == "SELECT":
-                return self._query(command, fetch)
-            else:
-                self._write(command)
-                select_sql = self.convert_sql_write_to_select(command)
-                logger.info(f"write result query:{select_sql}")
-                return self._query(select_sql)
-
-        else:
-            logger.info(
-                "DDL execution determines whether to enable through configuration "
-            )
-            with self.session_scope(commit=False) as session:
-                cursor = session.execute(text(command))
-                if cursor.returns_rows:
-                    result = cursor.fetchall()
-                    field_names = tuple(i[0:] for i in cursor.keys())
-                    result = list(result)
-                    result.insert(0, field_names)
-                    logger.info("DDL Result:" + str(result))
-                    if not result:
-                        # return self._query(f"SHOW COLUMNS FROM {table_name}")
-                        return self.get_simple_fields(table_name)
-                    return result
+        started_at = time.monotonic()
+        fingerprint = sql_fingerprint(command)
+        status = "failed"
+        returned_rows = 0
+        try:
+            if not command or len(command) < 0:
+                status = "succeeded"
+                return []
+            parsed, ttype, sql_type, table_name = self.__sql_parse(command)
+            command = self._format_sql(command)
+            if ttype == sqlparse.tokens.DML:
+                if sql_type == "SELECT":
+                    result = self._query(command, fetch)
                 else:
-                    return self.get_simple_fields(table_name)
+                    self._write(command)
+                    select_sql = self.convert_sql_write_to_select(command)
+                    logger.info(
+                        "Write result query_sha256=%s", sql_fingerprint(select_sql)
+                    )
+                    result = self._query(select_sql)
+            else:
+                logger.info(
+                    "DDL execution determines whether to enable through configuration "
+                )
+                with self.session_scope(commit=False) as session:
+                    cursor = session.execute(text(command))
+                    if cursor.returns_rows:
+                        rows = cursor.fetchall()
+                        field_names = tuple(i[0:] for i in cursor.keys())
+                        result = list(rows)
+                        result.insert(0, field_names)
+                        if not result:
+                            result = self.get_simple_fields(table_name)
+                    else:
+                        result = self.get_simple_fields(table_name)
+
+            status = "succeeded"
+            returned_rows = max(0, len(result) - 1) if result else 0
+            return result
+        except TimeoutError:
+            status = "timeout"
+            raise
+        finally:
+            logger.info(
+                "rdbms_sql_audit dialect=%s operation=run query_sha256=%s "
+                "status=%s duration_ms=%s returned_rows=%s",
+                self.dialect,
+                fingerprint,
+                status,
+                int((time.monotonic() - started_at) * 1000),
+                returned_rows,
+            )
 
     def run_to_df(self, command: str, fetch: str = "all"):
         """Execute sql command and return result as dataframe."""
@@ -675,7 +780,7 @@ class RDBMSConnector(BaseConnector):
             return self.run(command, fetch)
         except SQLAlchemyError as e:
             """Format the error message"""
-            logger.warning(f"Run SQL command failed: {e}")
+            logger.warning("Run SQL command failed (%s)", type(e).__name__)
             return []
 
     def convert_sql_write_to_select(self, write_sql: str) -> str:
@@ -754,7 +859,10 @@ class RDBMSConnector(BaseConnector):
         first_token = parsed.token_first(skip_ws=True, skip_cm=False)
         ttype = first_token.ttype
         logger.info(
-            f"SQL:{sql}, ttype:{ttype}, sql_type:{sql_type}, table:{table_name}"
+            "SQL query_sha256=%s token_type=%s statement_type=%s",
+            sql_fingerprint(sql),
+            ttype,
+            sql_type,
         )
         return parsed, ttype, sql_type, table_name
 

@@ -2,11 +2,13 @@
 Run unit test with command: pytest dbgpt/datasource/rdbms/tests/test_conn_sqlite.py
 """
 
+import logging
 import os
 import tempfile
 
 import pytest
 
+from dbgpt.datasource.sql_guard import sql_fingerprint
 from dbgpt_ext.datasource.rdbms.conn_sqlite import SQLiteConnector
 
 
@@ -45,6 +47,35 @@ def test_run_sql(db):
 
 def test_run_no_throw(db):
     assert db.run_no_throw("this is a error sql") == []
+
+
+def test_run_logs_execution_audit_without_sql_text(db, caplog):
+    query = "SELECT 'RUN_SENTINEL' AS value"
+
+    with caplog.at_level(logging.INFO, logger="dbgpt.datasource.rdbms.base"):
+        result = db.run(query)
+
+    assert result == [("value",), ("RUN_SENTINEL",)]
+    assert "rdbms_sql_audit" in caplog.text
+    assert "operation=run" in caplog.text
+    assert "status=succeeded" in caplog.text
+    assert "returned_rows=1" in caplog.text
+    assert sql_fingerprint(query) in caplog.text
+    assert query not in caplog.text
+    assert "RUN_SENTINEL" not in caplog.text
+
+
+def test_run_failure_logs_safe_audit_status(db, caplog):
+    query = "SELECT RUN_ERROR_SENTINEL FROM missing_table"
+
+    with caplog.at_level(logging.INFO, logger="dbgpt.datasource.rdbms.base"):
+        with pytest.raises(Exception):
+            db.run(query)
+
+    assert "operation=run" in caplog.text
+    assert "status=failed" in caplog.text
+    assert sql_fingerprint(query) in caplog.text
+    assert "RUN_ERROR_SENTINEL" not in caplog.text
 
 
 def test_get_indexes(db):
@@ -99,7 +130,36 @@ def test_query_ex(db):
 
     field_names, result = db.query_ex("select * from test", fetch="one")
     assert field_names == ["id"]
-    assert result == [1]
+    assert result == [(1,)]
+
+
+def test_query_ex_enforces_sqlite_timeout(db, caplog):
+    slow_recursive_query = """
+        WITH RECURSIVE counter(value) AS (
+            SELECT 1
+            UNION ALL
+            SELECT value + 1 FROM counter WHERE value < 100000000
+        )
+        SELECT SUM(value) FROM counter
+    """
+
+    with caplog.at_level(logging.INFO, logger="dbgpt.datasource.rdbms.base"):
+        with pytest.raises(TimeoutError, match="Query exceeded timeout"):
+            db.query_ex(slow_recursive_query, timeout=0.01)
+    assert "status=timeout" in caplog.text
+
+
+def test_query_ex_logs_fingerprint_without_sql_text(db, caplog):
+    query = "SELECT 'CONFIDENTIAL_SENTINEL' AS value"
+
+    with caplog.at_level(logging.INFO, logger="dbgpt.datasource.rdbms.base"):
+        db.query_ex(query)
+
+    assert query not in caplog.text
+    assert sql_fingerprint(query) in caplog.text
+    assert "rdbms_sql_audit" in caplog.text
+    assert "status=succeeded" in caplog.text
+    assert "returned_rows=1" in caplog.text
 
 
 def test_convert_sql_write_to_select(db):

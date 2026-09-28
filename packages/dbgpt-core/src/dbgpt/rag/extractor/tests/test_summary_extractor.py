@@ -29,6 +29,10 @@ class TestSummaryExtractor(unittest.IsolatedAsyncioTestCase):
         single_chunk = [Chunk(content="This is a test content.")]
         summary = await self.extractor._aextract(chunks=single_chunk)
         self.assertEqual("This is a test content" in summary, True)
+        self.assertEqual(
+            self.llm_client.generate.await_args_list[0].args[0].max_new_tokens,
+            256,
+        )
 
     async def test_multiple_chunks_extraction(self):
         chunks = [Chunk(content=f"Content {i}") for i in range(4)]

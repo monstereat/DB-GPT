@@ -1,0 +1,32 @@
+[
+  {
+    "id": "a01",
+    "question": "最近经营情况怎么样？",
+    "expected_missing_fields": ["time_range", "metric"]
+  },
+  {
+    "id": "a02",
+    "question": "第二季度业绩比第一季度好吗？",
+    "expected_missing_fields": ["metric"]
+  },
+  {
+    "id": "a03",
+    "question": "哪个商品表现最好？",
+    "expected_missing_fields": ["metric", "time_range"]
+  },
+  {
+    "id": "a04",
+    "question": "哪个地区退款率最高？",
+    "expected_missing_fields": ["time_range"]
+  },
+  {
+    "id": "a05",
+    "question": "复购表现怎么样？",
+    "expected_missing_fields": ["metric", "time_range"]
+  },
+  {
+    "id": "a06",
+    "question": "净销售额变化明显吗？",
+    "expected_missing_fields": ["time_range", "comparison_basis"]
+  }
+]

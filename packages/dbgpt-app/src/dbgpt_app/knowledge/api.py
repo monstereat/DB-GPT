@@ -42,6 +42,10 @@ from dbgpt_app.openapi.api_v1.api_v1 import (
     no_stream_generator,
     stream_generator,
 )
+from dbgpt_app.openapi.api_v1.token_quota import (
+    resolve_daily_token_quota_context,
+    safe_token_quota_error,
+)
 from dbgpt_app.openapi.api_view_model import Result
 from dbgpt_ext.rag import ChunkParameters
 from dbgpt_ext.rag.chunk_manager import ChunkStrategy
@@ -59,6 +63,11 @@ from dbgpt_serve.rag.api.schemas import (
 from dbgpt_serve.rag.service.service import Service
 from dbgpt_serve.rag.storage_manager import StorageManager
 from dbgpt_serve.utils.auth import UserRequest, get_user_from_headers
+from dbgpt_serve.utils.token_quota import (
+    daily_token_quota_enabled,
+    knowledge_retrieval_may_call_llm,
+    reject_unmetered_model_call,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -164,6 +173,12 @@ async def recall_test(
     user_token: UserRequest = Depends(get_user_from_headers),
 ):
     logger.info(f"/knowledge/{space_name}/recall_test params: {request}")
+    if daily_token_quota_enabled():
+        spaces = knowledge_space_service.get_knowledge_space(
+            KnowledgeSpaceRequest(name=space_name)
+        )
+        if spaces and knowledge_retrieval_may_call_llm(spaces[0]):
+            reject_unmetered_model_call("LLM-backed knowledge retrieval")
     try:
         return Result.succ(
             await knowledge_space_service.recall_test(space_name, request)
@@ -629,13 +644,28 @@ def similarity_query(space_name: str, query_request: KnowledgeQueryRequest):
 
 
 @router.post("/knowledge/document/summary")
-async def document_summary(request: DocumentSummaryRequest):
+async def document_summary(
+    request: DocumentSummaryRequest,
+    user_token: UserRequest = Depends(get_user_from_headers),
+):
     print(f"/document/summary params: {request}")
+    token_quota_context = None
+    if daily_token_quota_enabled():
+        setting_name = "DBGPT_DAILY_TOKEN_LIMIT"
+        configured_limit = os.getenv(setting_name)
+        if not configured_limit or not configured_limit.strip():
+            setting_name = "DBGPT_REACT_DAILY_TOKEN_LIMIT"
+            configured_limit = os.getenv(setting_name)
+        token_quota_context = resolve_daily_token_quota_context(
+            user_token, configured_limit, setting_name
+        )
     try:
         with root_tracer.start_span(
             "get_chat_instance", span_type=SpanType.CHAT, metadata=request
         ):
-            chat = await knowledge_space_service.document_summary(request=request)
+            chat = await knowledge_space_service.document_summary(
+                request=request, token_quota_context=token_quota_context
+            )
         headers = {
             "Content-Type": "text/event-stream",
             "Cache-Control": "no-cache",
@@ -657,4 +687,7 @@ async def document_summary(request: DocumentSummaryRequest):
                 media_type="text/plain",
             )
     except Exception as e:
+        quota_error = safe_token_quota_error(e)
+        if quota_error:
+            return Result.failed(code="E000X", msg=quota_error)
         return Result.failed(code="E000X", msg=f"document summary error {e}")

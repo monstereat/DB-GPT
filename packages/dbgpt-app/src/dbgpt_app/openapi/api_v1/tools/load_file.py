@@ -14,6 +14,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from dbgpt.agent.resource.tool.base import tool
 
+from .tool_tracing import trace_agent_tool
+
 MAX_LOAD_FILE_FILES = 20
 MAX_LOAD_FILE_CHARS = 4000
 
@@ -122,6 +124,7 @@ def make_load_file(react_state: Dict[str, Any]):
             'Parameters: {"file_ids": "optional subset of file ids"}'
         )
     )
+    @trace_agent_tool("agent.load_file")
     def load_file(file_ids: Optional[List[str]] = None) -> str:
         """Return bounded info for the selected files."""
         manifests = list(react_state.get("session_files") or [])

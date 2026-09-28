@@ -8,6 +8,7 @@ from typing import Any, Callable, Dict
 from dbgpt.agent.resource.tool.base import tool
 
 from .question_manager import question_manager
+from .tool_tracing import trace_agent_tool
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,7 @@ def make_question(react_state: Dict[str, Any], stream_callback: Callable):
     """Return a ``question`` FunctionTool bound to react_state and stream_callback."""
 
     @tool(description=_DESCRIPTION)
+    @trace_agent_tool("agent.question")
     async def question(questions: str) -> str:
         """Ask the user one or more questions and wait for their answers.
 

@@ -1,0 +1,1039 @@
+[
+  {
+    "id": "q01",
+    "question": "第二季度各地区销售额是多少？",
+    "sql": "SELECT r.name AS region, SUM(o.total_cents) AS sales_cents FROM orders o JOIN regions r ON r.region_id=o.region_id WHERE o.created_at >= '2026-04-01' AND o.created_at < '2026-07-01' AND o.status='completed' GROUP BY r.name ORDER BY sales_cents DESC",
+    "expected": {
+      "columns": [
+        "region",
+        "sales_cents"
+      ],
+      "rows": [
+        [
+          "Guangzhou",
+          45000
+        ],
+        [
+          "Shenzhen",
+          32000
+        ]
+      ]
+    },
+    "category": "regional_sales",
+    "order_sensitive": false
+  },
+  {
+    "id": "q02",
+    "question": "第二季度各地区退款金额是多少？",
+    "sql": "SELECT r.name AS region, SUM(f.amount_cents) AS refunded_cents FROM refunds f JOIN orders o ON o.order_id=f.order_id JOIN regions r ON r.region_id=o.region_id WHERE f.created_at >= '2026-04-01' AND f.created_at < '2026-07-01' GROUP BY r.name ORDER BY refunded_cents DESC",
+    "expected": {
+      "columns": [
+        "region",
+        "refunded_cents"
+      ],
+      "rows": [
+        [
+          "Guangzhou",
+          2500
+        ],
+        [
+          "Shenzhen",
+          2200
+        ]
+      ]
+    },
+    "category": "refunds",
+    "order_sensitive": false
+  },
+  {
+    "id": "q03",
+    "question": "第二季度完成了多少笔订单？",
+    "sql": "SELECT COUNT(*) AS total FROM orders WHERE created_at >= '2026-04-01' AND created_at < '2026-07-01' AND status='completed'",
+    "expected": {
+      "columns": [
+        "total"
+      ],
+      "rows": [
+        [
+          5
+        ]
+      ]
+    },
+    "category": "order_counts",
+    "order_sensitive": false
+  },
+  {
+    "id": "q04",
+    "question": "第二季度取消了多少笔订单？",
+    "sql": "SELECT COUNT(*) AS total FROM orders WHERE created_at >= '2026-04-01' AND created_at < '2026-07-01' AND status='cancelled'",
+    "expected": {
+      "columns": [
+        "total"
+      ],
+      "rows": [
+        [
+          1
+        ]
+      ]
+    },
+    "category": "order_counts",
+    "order_sensitive": false
+  },
+  {
+    "id": "q05",
+    "question": "第二季度完成订单销售总额是多少？",
+    "sql": "SELECT SUM(total_cents) AS sales_cents FROM orders WHERE created_at >= '2026-04-01' AND created_at < '2026-07-01' AND status='completed'",
+    "expected": {
+      "columns": [
+        "sales_cents"
+      ],
+      "rows": [
+        [
+          77000
+        ]
+      ]
+    },
+    "category": "sales_aggregates",
+    "order_sensitive": false
+  },
+  {
+    "id": "q06",
+    "question": "第二季度已支付退款总额是多少？",
+    "sql": "SELECT SUM(amount_cents) AS refunded_cents FROM refunds WHERE created_at >= '2026-04-01' AND created_at < '2026-07-01' AND status='paid'",
+    "expected": {
+      "columns": [
+        "refunded_cents"
+      ],
+      "rows": [
+        [
+          4700
+        ]
+      ]
+    },
+    "category": "refunds",
+    "order_sensitive": false
+  },
+  {
+    "id": "q07",
+    "question": "第二季度净销售额是多少？",
+    "sql": "SELECT (SELECT SUM(total_cents) FROM orders WHERE created_at >= '2026-04-01' AND created_at < '2026-07-01' AND status='completed') - (SELECT SUM(amount_cents) FROM refunds WHERE created_at >= '2026-04-01' AND created_at < '2026-07-01' AND status='paid') AS net_sales_cents",
+    "expected": {
+      "columns": [
+        "net_sales_cents"
+      ],
+      "rows": [
+        [
+          72300
+        ]
+      ]
+    },
+    "category": "sales_aggregates",
+    "order_sensitive": false
+  },
+  {
+    "id": "q08",
+    "question": "第二季度平均订单金额是多少？",
+    "sql": "SELECT AVG(total_cents) AS average_order_cents FROM orders WHERE created_at >= '2026-04-01' AND created_at < '2026-07-01' AND status='completed'",
+    "expected": {
+      "columns": [
+        "average_order_cents"
+      ],
+      "rows": [
+        [
+          15400.0
+        ]
+      ]
+    },
+    "category": "sales_aggregates",
+    "order_sensitive": false
+  },
+  {
+    "id": "q09",
+    "question": "第二季度每月销售额是多少？",
+    "sql": "SELECT strftime('%Y-%m', created_at) AS month, SUM(total_cents) AS sales_cents FROM orders WHERE created_at >= '2026-04-01' AND created_at < '2026-07-01' AND status='completed' GROUP BY month ORDER BY month",
+    "expected": {
+      "columns": [
+        "month",
+        "sales_cents"
+      ],
+      "rows": [
+        [
+          "2026-04",
+          10000
+        ],
+        [
+          "2026-05",
+          32000
+        ],
+        [
+          "2026-06",
+          35000
+        ]
+      ]
+    },
+    "category": "time_series",
+    "order_sensitive": true
+  },
+  {
+    "id": "q10",
+    "question": "第二季度各地区完成订单数是多少？",
+    "sql": "SELECT r.name, COUNT(*) AS orders FROM orders o JOIN regions r ON r.region_id=o.region_id WHERE o.created_at >= '2026-04-01' AND o.created_at < '2026-07-01' AND o.status='completed' GROUP BY r.name ORDER BY r.name",
+    "expected": {
+      "columns": [
+        "name",
+        "orders"
+      ],
+      "rows": [
+        [
+          "Guangzhou",
+          3
+        ],
+        [
+          "Shenzhen",
+          2
+        ]
+      ]
+    },
+    "category": "regional_sales",
+    "order_sensitive": false
+  },
+  {
+    "id": "q11",
+    "question": "第二季度各商品类别销售额是多少？",
+    "sql": "SELECT p.category, SUM(i.quantity*i.unit_price_cents) AS sales_cents FROM order_items i JOIN orders o ON o.order_id=i.order_id JOIN products p ON p.product_id=i.product_id WHERE o.created_at >= '2026-04-01' AND o.created_at < '2026-07-01' AND o.status='completed' GROUP BY p.category ORDER BY sales_cents DESC",
+    "expected": {
+      "columns": [
+        "category",
+        "sales_cents"
+      ],
+      "rows": [
+        [
+          "Furniture",
+          35000
+        ],
+        [
+          "Accessories",
+          22000
+        ],
+        [
+          "Electronics",
+          20000
+        ]
+      ]
+    },
+    "category": "product_analysis",
+    "order_sensitive": false
+  },
+  {
+    "id": "q12",
+    "question": "第二季度各商品类别销量是多少？",
+    "sql": "SELECT p.category, SUM(i.quantity) AS units FROM order_items i JOIN orders o ON o.order_id=i.order_id JOIN products p ON p.product_id=i.product_id WHERE o.created_at >= '2026-04-01' AND o.created_at < '2026-07-01' AND o.status='completed' GROUP BY p.category ORDER BY units DESC",
+    "expected": {
+      "columns": [
+        "category",
+        "units"
+      ],
+      "rows": [
+        [
+          "Accessories",
+          4
+        ],
+        [
+          "Furniture",
+          3
+        ],
+        [
+          "Electronics",
+          2
+        ]
+      ]
+    },
+    "category": "product_analysis",
+    "order_sensitive": false
+  },
+  {
+    "id": "q13",
+    "question": "第二季度各商品销量是多少？",
+    "sql": "SELECT p.product_name, SUM(i.quantity) AS units FROM order_items i JOIN orders o ON o.order_id=i.order_id JOIN products p ON p.product_id=i.product_id WHERE o.created_at >= '2026-04-01' AND o.created_at < '2026-07-01' AND o.status='completed' GROUP BY p.product_name ORDER BY units DESC",
+    "expected": {
+      "columns": [
+        "product_name",
+        "units"
+      ],
+      "rows": [
+        [
+          "Case",
+          4
+        ],
+        [
+          "Chair",
+          3
+        ],
+        [
+          "Phone",
+          2
+        ]
+      ]
+    },
+    "category": "product_analysis",
+    "order_sensitive": false
+  },
+  {
+    "id": "q14",
+    "question": "第二季度每月退款金额是多少？",
+    "sql": "SELECT strftime('%Y-%m', created_at) AS month, SUM(amount_cents) AS refunded_cents FROM refunds WHERE created_at >= '2026-04-01' AND created_at < '2026-07-01' AND status='paid' GROUP BY month ORDER BY month",
+    "expected": {
+      "columns": [
+        "month",
+        "refunded_cents"
+      ],
+      "rows": [
+        [
+          "2026-05",
+          3200
+        ],
+        [
+          "2026-06",
+          1500
+        ]
+      ]
+    },
+    "category": "refunds",
+    "order_sensitive": true
+  },
+  {
+    "id": "q15",
+    "question": "第二季度退款率是多少？",
+    "sql": "SELECT ROUND(100.0*(SELECT SUM(amount_cents) FROM refunds WHERE created_at >= '2026-04-01' AND created_at < '2026-07-01' AND status='paid')/(SELECT SUM(total_cents) FROM orders WHERE created_at >= '2026-04-01' AND created_at < '2026-07-01' AND status='completed'), 2) AS refund_rate_pct",
+    "expected": {
+      "columns": [
+        "refund_rate_pct"
+      ],
+      "rows": [
+        [
+          6.1
+        ]
+      ]
+    },
+    "category": "refunds",
+    "order_sensitive": false
+  },
+  {
+    "id": "q16",
+    "question": "第二季度完成订单的客户数是多少？",
+    "sql": "SELECT COUNT(DISTINCT user_id) AS customers FROM orders WHERE created_at >= '2026-04-01' AND created_at < '2026-07-01' AND status='completed'",
+    "expected": {
+      "columns": [
+        "customers"
+      ],
+      "rows": [
+        [
+          2
+        ]
+      ]
+    },
+    "category": "customer_analysis",
+    "order_sensitive": false
+  },
+  {
+    "id": "q17",
+    "question": "第二季度广州销售额是多少？",
+    "sql": "SELECT SUM(o.total_cents) AS sales_cents FROM orders o JOIN regions r ON r.region_id=o.region_id WHERE r.name='Guangzhou' AND o.created_at >= '2026-04-01' AND o.created_at < '2026-07-01' AND o.status='completed'",
+    "expected": {
+      "columns": [
+        "sales_cents"
+      ],
+      "rows": [
+        [
+          45000
+        ]
+      ]
+    },
+    "category": "regional_sales",
+    "order_sensitive": false
+  },
+  {
+    "id": "q18",
+    "question": "第二季度深圳销售额是多少？",
+    "sql": "SELECT SUM(o.total_cents) AS sales_cents FROM orders o JOIN regions r ON r.region_id=o.region_id WHERE r.name='Shenzhen' AND o.created_at >= '2026-04-01' AND o.created_at < '2026-07-01' AND o.status='completed'",
+    "expected": {
+      "columns": [
+        "sales_cents"
+      ],
+      "rows": [
+        [
+          32000
+        ]
+      ]
+    },
+    "category": "regional_sales",
+    "order_sensitive": false
+  },
+  {
+    "id": "q19",
+    "question": "第二季度四月完成了多少笔订单？",
+    "sql": "SELECT COUNT(*) AS orders FROM orders WHERE created_at >= '2026-04-01' AND created_at < '2026-05-01' AND status='completed'",
+    "expected": {
+      "columns": [
+        "orders"
+      ],
+      "rows": [
+        [
+          1
+        ]
+      ]
+    },
+    "category": "time_series",
+    "order_sensitive": false
+  },
+  {
+    "id": "q20",
+    "question": "第二季度五月完成了多少笔订单？",
+    "sql": "SELECT COUNT(*) AS orders FROM orders WHERE created_at >= '2026-05-01' AND created_at < '2026-06-01' AND status='completed'",
+    "expected": {
+      "columns": [
+        "orders"
+      ],
+      "rows": [
+        [
+          2
+        ]
+      ]
+    },
+    "category": "time_series",
+    "order_sensitive": false
+  },
+  {
+    "id": "q21",
+    "question": "第二季度六月完成了多少笔订单？",
+    "sql": "SELECT COUNT(*) AS orders FROM orders WHERE created_at >= '2026-06-01' AND created_at < '2026-07-01' AND status='completed'",
+    "expected": {
+      "columns": [
+        "orders"
+      ],
+      "rows": [
+        [
+          2
+        ]
+      ]
+    },
+    "category": "time_series",
+    "order_sensitive": false
+  },
+  {
+    "id": "q22",
+    "question": "第二季度销量最高的商品类别是什么？",
+    "sql": "SELECT p.category, SUM(i.quantity) AS units FROM order_items i JOIN orders o ON o.order_id=i.order_id JOIN products p ON p.product_id=i.product_id WHERE o.created_at >= '2026-04-01' AND o.created_at < '2026-07-01' AND o.status='completed' GROUP BY p.category ORDER BY units DESC LIMIT 1",
+    "expected": {
+      "columns": [
+        "category",
+        "units"
+      ],
+      "rows": [
+        [
+          "Accessories",
+          4
+        ]
+      ]
+    },
+    "category": "product_analysis",
+    "order_sensitive": false
+  },
+  {
+    "id": "q23",
+    "question": "第二季度有多少种商品售出？",
+    "sql": "SELECT COUNT(DISTINCT i.product_id) AS products FROM order_items i JOIN orders o ON o.order_id=i.order_id WHERE o.created_at >= '2026-04-01' AND o.created_at < '2026-07-01' AND o.status='completed'",
+    "expected": {
+      "columns": [
+        "products"
+      ],
+      "rows": [
+        [
+          3
+        ]
+      ]
+    },
+    "category": "product_analysis",
+    "order_sensitive": false
+  },
+  {
+    "id": "q24",
+    "question": "第二季度最近一笔完成订单日期是什么？",
+    "sql": "SELECT MAX(created_at) AS latest_order FROM orders WHERE created_at >= '2026-04-01' AND created_at < '2026-07-01' AND status='completed'",
+    "expected": {
+      "columns": [
+        "latest_order"
+      ],
+      "rows": [
+        [
+          "2026-06-29"
+        ]
+      ]
+    },
+    "category": "time_series",
+    "order_sensitive": false
+  },
+  {
+    "id": "q25",
+    "question": "第二季度最大完成订单金额是多少？",
+    "sql": "SELECT MAX(total_cents) AS max_order_cents FROM orders WHERE created_at >= '2026-04-01' AND created_at < '2026-07-01' AND status='completed'",
+    "expected": {
+      "columns": [
+        "max_order_cents"
+      ],
+      "rows": [
+        [
+          20000
+        ]
+      ]
+    },
+    "category": "order_amount_analysis",
+    "order_sensitive": false
+  },
+  {
+    "id": "q26",
+    "question": "第二季度最小完成订单金额是多少？",
+    "sql": "SELECT MIN(total_cents) AS min_order_cents FROM orders WHERE created_at >= '2026-04-01' AND created_at < '2026-07-01' AND status='completed'",
+    "expected": {
+      "columns": [
+        "min_order_cents"
+      ],
+      "rows": [
+        [
+          10000
+        ]
+      ]
+    },
+    "category": "order_amount_analysis",
+    "order_sensitive": false
+  },
+  {
+    "id": "q27",
+    "question": "第二季度平均退款金额是多少？",
+    "sql": "SELECT AVG(amount_cents) AS average_refund_cents FROM refunds WHERE created_at >= '2026-04-01' AND created_at < '2026-07-01' AND status='paid'",
+    "expected": {
+      "columns": [
+        "average_refund_cents"
+      ],
+      "rows": [
+        [
+          1175.0
+        ]
+      ]
+    },
+    "category": "refunds",
+    "order_sensitive": false
+  },
+  {
+    "id": "q28",
+    "question": "2025 年第二季度销售额是多少？",
+    "sql": "SELECT SUM(total_cents) AS sales_cents FROM orders WHERE created_at >= '2025-04-01' AND created_at < '2025-07-01' AND status='completed'",
+    "expected": {
+      "columns": [
+        "sales_cents"
+      ],
+      "rows": [
+        [
+          8000
+        ]
+      ]
+    },
+    "category": "time_series",
+    "order_sensitive": false
+  },
+  {
+    "id": "q29",
+    "question": "第二季度销售额超过三万元的地区有几个？",
+    "sql": "SELECT COUNT(*) AS regions FROM (SELECT r.name FROM orders o JOIN regions r ON r.region_id=o.region_id WHERE o.created_at >= '2026-04-01' AND o.created_at < '2026-07-01' AND o.status='completed' GROUP BY r.name HAVING SUM(o.total_cents)>30000)",
+    "expected": {
+      "columns": [
+        "regions"
+      ],
+      "rows": [
+        [
+          2
+        ]
+      ]
+    },
+    "category": "regional_sales",
+    "order_sensitive": false
+  },
+  {
+    "id": "q30",
+    "question": "第二季度有多少笔订单发生过已支付退款？",
+    "sql": "SELECT COUNT(DISTINCT o.order_id) AS refunded_orders FROM refunds f JOIN orders o ON o.order_id=f.order_id WHERE f.created_at >= '2026-04-01' AND f.created_at < '2026-07-01' AND f.status='paid'",
+    "expected": {
+      "columns": [
+        "refunded_orders"
+      ],
+      "rows": [
+        [
+          4
+        ]
+      ]
+    },
+    "category": "refunds",
+    "order_sensitive": false
+  },
+  {
+    "id": "q31",
+    "question": "第二季度各地区扣除已支付退款后的净销售额是多少？",
+    "sql": "WITH sales AS (SELECT region_id, SUM(total_cents) AS sales_cents FROM orders WHERE created_at >= '2026-04-01' AND created_at < '2026-07-01' AND status='completed' GROUP BY region_id), refund_totals AS (SELECT o.region_id, SUM(f.amount_cents) AS refunded_cents FROM refunds f JOIN orders o ON o.order_id=f.order_id WHERE f.created_at >= '2026-04-01' AND f.created_at < '2026-07-01' AND f.status='paid' GROUP BY o.region_id) SELECT r.name AS region, sales.sales_cents-COALESCE(refund_totals.refunded_cents, 0) AS net_sales_cents FROM sales JOIN regions r ON r.region_id=sales.region_id LEFT JOIN refund_totals ON refund_totals.region_id=sales.region_id ORDER BY net_sales_cents DESC",
+    "expected": {
+      "columns": [
+        "region",
+        "net_sales_cents"
+      ],
+      "rows": [
+        [
+          "Guangzhou",
+          42500
+        ],
+        [
+          "Shenzhen",
+          29800
+        ]
+      ]
+    },
+    "category": "regional_sales",
+    "order_sensitive": false
+  },
+  {
+    "id": "q32",
+    "question": "第二季度各品类平均每笔完成订单售出多少件？",
+    "sql": "SELECT p.category, ROUND(1.0*SUM(i.quantity)/COUNT(DISTINCT o.order_id), 2) AS units_per_order FROM order_items i JOIN orders o ON o.order_id=i.order_id JOIN products p ON p.product_id=i.product_id WHERE o.created_at >= '2026-04-01' AND o.created_at < '2026-07-01' AND o.status='completed' GROUP BY p.category ORDER BY units_per_order DESC, p.category",
+    "expected": {
+      "columns": [
+        "category",
+        "units_per_order"
+      ],
+      "rows": [
+        [
+          "Accessories",
+          2.0
+        ],
+        [
+          "Furniture",
+          1.5
+        ],
+        [
+          "Electronics",
+          1.0
+        ]
+      ]
+    },
+    "category": "product_analysis",
+    "order_sensitive": false
+  },
+  {
+    "id": "q33",
+    "question": "第二季度没有售出的商品有哪些？",
+    "sql": "SELECT p.product_name, p.category FROM products p WHERE NOT EXISTS (SELECT 1 FROM order_items i JOIN orders o ON o.order_id=i.order_id WHERE i.product_id=p.product_id AND o.created_at >= '2026-04-01' AND o.created_at < '2026-07-01' AND o.status='completed') ORDER BY p.product_name",
+    "expected": {
+      "columns": [
+        "product_name",
+        "category"
+      ],
+      "rows": [
+        [
+          "Tablet",
+          "Electronics"
+        ]
+      ]
+    },
+    "category": "product_analysis",
+    "order_sensitive": false
+  },
+  {
+    "id": "q34",
+    "question": "第二季度发生退款的订单及其退款金额分别是多少？",
+    "sql": "SELECT o.order_id, SUM(f.amount_cents) AS refunded_cents FROM refunds f JOIN orders o ON o.order_id=f.order_id WHERE f.created_at >= '2026-04-01' AND f.created_at < '2026-07-01' AND f.status='paid' GROUP BY o.order_id ORDER BY o.order_id",
+    "expected": {
+      "columns": [
+        "order_id",
+        "refunded_cents"
+      ],
+      "rows": [
+        [
+          2,
+          2000
+        ],
+        [
+          3,
+          1000
+        ],
+        [
+          7,
+          1200
+        ],
+        [
+          8,
+          500
+        ]
+      ]
+    },
+    "category": "refunds",
+    "order_sensitive": false
+  },
+  {
+    "id": "q35",
+    "question": "第二季度各地区完成订单率是多少？",
+    "sql": "SELECT r.name AS region, ROUND(100.0*SUM(CASE WHEN o.status='completed' THEN 1 ELSE 0 END)/COUNT(*), 2) AS completion_rate_pct FROM orders o JOIN regions r ON r.region_id=o.region_id WHERE o.created_at >= '2026-04-01' AND o.created_at < '2026-07-01' GROUP BY r.name ORDER BY r.name",
+    "expected": {
+      "columns": [
+        "region",
+        "completion_rate_pct"
+      ],
+      "rows": [
+        [
+          "Guangzhou",
+          100.0
+        ],
+        [
+          "Shenzhen",
+          66.67
+        ]
+      ]
+    },
+    "category": "regional_sales",
+    "order_sensitive": false
+  },
+  {
+    "id": "q36",
+    "question": "第二季度各地区有多少笔订单发生过已支付退款？",
+    "sql": "SELECT r.name AS region, COUNT(DISTINCT f.order_id) AS refunded_orders FROM refunds f JOIN orders o ON o.order_id=f.order_id JOIN regions r ON r.region_id=o.region_id WHERE f.created_at >= '2026-04-01' AND f.created_at < '2026-07-01' AND f.status='paid' GROUP BY r.name ORDER BY r.name",
+    "expected": {
+      "columns": [
+        "region",
+        "refunded_orders"
+      ],
+      "rows": [
+        [
+          "Guangzhou",
+          2
+        ],
+        [
+          "Shenzhen",
+          2
+        ]
+      ]
+    },
+    "category": "regional_sales",
+    "order_sensitive": false
+  },
+  {
+    "id": "q37",
+    "question": "第二季度各地区最早和最晚的完成订单日期是什么？",
+    "sql": "SELECT r.name AS region, MIN(o.created_at) AS first_order, MAX(o.created_at) AS last_order FROM orders o JOIN regions r ON r.region_id=o.region_id WHERE o.created_at >= '2026-04-01' AND o.created_at < '2026-07-01' AND o.status='completed' GROUP BY r.name ORDER BY r.name",
+    "expected": {
+      "columns": [
+        "region",
+        "first_order",
+        "last_order"
+      ],
+      "rows": [
+        [
+          "Guangzhou",
+          "2026-04-03",
+          "2026-06-29"
+        ],
+        [
+          "Shenzhen",
+          "2026-05-21",
+          "2026-06-18"
+        ]
+      ]
+    },
+    "category": "time_series",
+    "order_sensitive": false
+  },
+  {
+    "id": "q38",
+    "question": "六月完成订单销售额和当月已支付退款额分别是多少？",
+    "sql": "SELECT (SELECT SUM(total_cents) FROM orders WHERE created_at >= '2026-06-01' AND created_at < '2026-07-01' AND status='completed') AS sales_cents, (SELECT SUM(amount_cents) FROM refunds WHERE created_at >= '2026-06-01' AND created_at < '2026-07-01' AND status='paid') AS refunded_cents",
+    "expected": {
+      "columns": [
+        "sales_cents",
+        "refunded_cents"
+      ],
+      "rows": [
+        [
+          35000,
+          1500
+        ]
+      ]
+    },
+    "category": "refunds",
+    "order_sensitive": false
+  },
+  {
+    "id": "q39",
+    "question": "第二季度金额严格高于一万五千元的完成订单有几笔？",
+    "sql": "SELECT COUNT(*) AS orders FROM orders WHERE created_at >= '2026-04-01' AND created_at < '2026-07-01' AND status='completed' AND total_cents > 15000",
+    "expected": {
+      "columns": [
+        "orders"
+      ],
+      "rows": [
+        [
+          2
+        ]
+      ]
+    },
+    "category": "order_amount_analysis",
+    "order_sensitive": false
+  },
+  {
+    "id": "q40",
+    "question": "第二季度有几位客户重复完成了订单？",
+    "sql": "SELECT COUNT(*) AS repeat_customers FROM (SELECT user_id FROM orders WHERE created_at >= '2026-04-01' AND created_at < '2026-07-01' AND status='completed' GROUP BY user_id HAVING COUNT(*) > 1)",
+    "expected": {
+      "columns": [
+        "repeat_customers"
+      ],
+      "rows": [
+        [
+          2
+        ]
+      ]
+    },
+    "category": "customer_analysis",
+    "order_sensitive": false
+  },
+  {
+    "id": "q41",
+    "question": "第二季度华南区销售额和退款率分别是多少？",
+    "sql": "WITH sales_totals AS (SELECT SUM(o.total_cents) AS sales_cents FROM orders o JOIN regions r ON r.region_id=o.region_id WHERE r.area='South China' AND o.created_at >= '2026-04-01' AND o.created_at < '2026-07-01' AND o.status='completed'), refund_totals AS (SELECT SUM(f.amount_cents) AS refunded_cents FROM refunds f JOIN orders o ON o.order_id=f.order_id JOIN regions r ON r.region_id=o.region_id WHERE r.area='South China' AND f.created_at >= '2026-04-01' AND f.created_at < '2026-07-01' AND f.status='paid') SELECT sales_totals.sales_cents, ROUND(100.0*refund_totals.refunded_cents/sales_totals.sales_cents, 2) AS refund_rate_pct FROM sales_totals CROSS JOIN refund_totals",
+    "expected": {
+      "columns": [
+        "sales_cents",
+        "refund_rate_pct"
+      ],
+      "rows": [
+        [
+          77000,
+          6.1
+        ]
+      ]
+    },
+    "category": "regional_sales",
+    "order_sensitive": false
+  },
+  {
+    "id": "q42",
+    "question": "前文：第二季度华南区销售额和退款率分别是多少？追问：其中哪个城市的退款率最高？",
+    "sql": "WITH sales_by_region AS (SELECT r.name AS region, SUM(o.total_cents) AS sales_cents FROM orders o JOIN regions r ON r.region_id=o.region_id WHERE r.area='South China' AND o.created_at >= '2026-04-01' AND o.created_at < '2026-07-01' AND o.status='completed' GROUP BY r.name), refund_by_region AS (SELECT r.name AS region, SUM(f.amount_cents) AS refunded_cents FROM refunds f JOIN orders o ON o.order_id=f.order_id JOIN regions r ON r.region_id=o.region_id WHERE r.area='South China' AND f.created_at >= '2026-04-01' AND f.created_at < '2026-07-01' AND f.status='paid' GROUP BY r.name) SELECT s.region, ROUND(100.0*refund_by_region.refunded_cents/s.sales_cents, 2) AS refund_rate_pct FROM sales_by_region s JOIN refund_by_region ON refund_by_region.region=s.region ORDER BY refund_rate_pct DESC LIMIT 1",
+    "expected": {
+      "columns": [
+        "region",
+        "refund_rate_pct"
+      ],
+      "rows": [
+        [
+          "Shenzhen",
+          6.88
+        ]
+      ]
+    },
+    "category": "multiturn_analysis",
+    "order_sensitive": false
+  },
+  {
+    "id": "q43",
+    "question": "前文：六月完成订单销售额和当月已支付退款额分别是多少？追问：退款率呢？",
+    "sql": "SELECT ROUND(100.0*(SELECT SUM(amount_cents) FROM refunds WHERE created_at >= '2026-06-01' AND created_at < '2026-07-01' AND status='paid')/(SELECT SUM(total_cents) FROM orders WHERE created_at >= '2026-06-01' AND created_at < '2026-07-01' AND status='completed'), 2) AS refund_rate_pct",
+    "expected": {
+      "columns": [
+        "refund_rate_pct"
+      ],
+      "rows": [
+        [
+          4.29
+        ]
+      ]
+    },
+    "category": "multiturn_analysis",
+    "order_sensitive": false
+  },
+  {
+    "id": "q44",
+    "question": "前文：第二季度华南区销售额和退款率分别是多少？追问：广州销售额占华南区的比例是多少？",
+    "sql": "SELECT ROUND(100.0*SUM(CASE WHEN r.name='Guangzhou' THEN o.total_cents ELSE 0 END)/SUM(o.total_cents), 2) AS sales_share_pct FROM orders o JOIN regions r ON r.region_id=o.region_id WHERE r.area='South China' AND o.created_at >= '2026-04-01' AND o.created_at < '2026-07-01' AND o.status='completed'",
+    "expected": {
+      "columns": [
+        "sales_share_pct"
+      ],
+      "rows": [
+        [
+          58.44
+        ]
+      ]
+    },
+    "category": "multiturn_analysis",
+    "order_sensitive": false
+  },
+  {
+    "id": "q45",
+    "question": "第二季度每月完成订单的活跃客户数和平均订单金额是多少？",
+    "sql": "SELECT substr(created_at,1,7) AS month, COUNT(DISTINCT user_id) AS active_customers, ROUND(1.0*SUM(total_cents)/COUNT(*),2) AS average_order_cents FROM orders WHERE created_at >= '2026-04-01' AND created_at < '2026-07-01' AND status='completed' GROUP BY substr(created_at,1,7) ORDER BY month",
+    "expected": {
+      "columns": [
+        "month",
+        "active_customers",
+        "average_order_cents"
+      ],
+      "rows": [
+        [
+          "2026-04",
+          1,
+          10000.0
+        ],
+        [
+          "2026-05",
+          1,
+          16000.0
+        ],
+        [
+          "2026-06",
+          1,
+          17500.0
+        ]
+      ]
+    },
+    "category": "customer_analysis",
+    "order_sensitive": true
+  },
+  {
+    "id": "q46",
+    "question": "第二季度各品类商品的加权平均成交单价是多少？",
+    "sql": "SELECT p.category, ROUND(1.0*SUM(i.quantity*i.unit_price_cents)/SUM(i.quantity),2) AS weighted_unit_price_cents FROM order_items i JOIN orders o ON o.order_id=i.order_id JOIN products p ON p.product_id=i.product_id WHERE o.created_at >= '2026-04-01' AND o.created_at < '2026-07-01' AND o.status='completed' GROUP BY p.category ORDER BY p.category",
+    "expected": {
+      "columns": [
+        "category",
+        "weighted_unit_price_cents"
+      ],
+      "rows": [
+        [
+          "Accessories",
+          5500.0
+        ],
+        [
+          "Electronics",
+          10000.0
+        ],
+        [
+          "Furniture",
+          11666.67
+        ]
+      ]
+    },
+    "category": "product_analysis",
+    "order_sensitive": false
+  },
+  {
+    "id": "q47",
+    "question": "第二季度完成订单销售额前三的商品是什么？",
+    "sql": "SELECT p.product_name, SUM(i.quantity*i.unit_price_cents) AS sales_cents FROM order_items i JOIN orders o ON o.order_id=i.order_id JOIN products p ON p.product_id=i.product_id WHERE o.created_at >= '2026-04-01' AND o.created_at < '2026-07-01' AND o.status='completed' GROUP BY p.product_id,p.product_name ORDER BY sales_cents DESC,p.product_name LIMIT 3",
+    "expected": {
+      "columns": [
+        "product_name",
+        "sales_cents"
+      ],
+      "rows": [
+        [
+          "Chair",
+          35000
+        ],
+        [
+          "Case",
+          22000
+        ],
+        [
+          "Phone",
+          20000
+        ]
+      ]
+    },
+    "category": "product_analysis",
+    "order_sensitive": true
+  },
+  {
+    "id": "q48",
+    "question": "第二季度各地区已支付退款订单数占完成订单数的比例是多少？",
+    "sql": "WITH completed AS (SELECT region_id,COUNT(*) AS completed_orders FROM orders WHERE created_at >= '2026-04-01' AND created_at < '2026-07-01' AND status='completed' GROUP BY region_id), refunded AS (SELECT o.region_id,COUNT(DISTINCT o.order_id) AS refunded_orders FROM orders o JOIN refunds f ON f.order_id=o.order_id WHERE o.created_at >= '2026-04-01' AND o.created_at < '2026-07-01' AND o.status='completed' AND f.created_at >= '2026-04-01' AND f.created_at < '2026-07-01' AND f.status='paid' GROUP BY o.region_id) SELECT r.name AS region,ROUND(100.0*COALESCE(refunded.refunded_orders,0)/completed.completed_orders,2) AS refunded_order_rate_pct FROM completed JOIN regions r ON r.region_id=completed.region_id LEFT JOIN refunded ON refunded.region_id=completed.region_id ORDER BY r.name",
+    "expected": {
+      "columns": [
+        "region",
+        "refunded_order_rate_pct"
+      ],
+      "rows": [
+        [
+          "Guangzhou",
+          66.67
+        ],
+        [
+          "Shenzhen",
+          100.0
+        ]
+      ]
+    },
+    "category": "regional_sales",
+    "order_sensitive": false
+  },
+  {
+    "id": "q49",
+    "question": "第二季度完成订单销售额最高的客户及其销售额占比是多少？",
+    "sql": "WITH customer_sales AS (SELECT user_id,SUM(total_cents) AS sales_cents FROM orders WHERE created_at >= '2026-04-01' AND created_at < '2026-07-01' AND status='completed' GROUP BY user_id), ranked AS (SELECT user_id,sales_cents,SUM(sales_cents) OVER () AS all_sales FROM customer_sales) SELECT user_id,sales_cents,ROUND(100.0*sales_cents/all_sales,2) AS sales_share_pct FROM ranked ORDER BY sales_cents DESC,user_id LIMIT 1",
+    "expected": {
+      "columns": [
+        "user_id",
+        "sales_cents",
+        "sales_share_pct"
+      ],
+      "rows": [
+        [
+          "a-u1",
+          45000,
+          58.44
+        ]
+      ]
+    },
+    "category": "customer_analysis",
+    "order_sensitive": false
+  },
+  {
+    "id": "q50",
+    "question": "第二季度各地区不同订单状态的订单数和订单金额分别是多少？",
+    "sql": "SELECT r.name AS region,o.status,COUNT(*) AS order_count,SUM(o.total_cents) AS order_value_cents FROM orders o JOIN regions r ON r.region_id=o.region_id WHERE o.created_at >= '2026-04-01' AND o.created_at < '2026-07-01' GROUP BY r.name,o.status ORDER BY r.name,o.status",
+    "expected": {
+      "columns": [
+        "region",
+        "status",
+        "order_count",
+        "order_value_cents"
+      ],
+      "rows": [
+        [
+          "Guangzhou",
+          "completed",
+          3,
+          45000
+        ],
+        [
+          "Shenzhen",
+          "cancelled",
+          1,
+          5000
+        ],
+        [
+          "Shenzhen",
+          "completed",
+          2,
+          32000
+        ]
+      ]
+    },
+    "category": "order_counts",
+    "order_sensitive": false
+  }
+]

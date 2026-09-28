@@ -6,6 +6,8 @@ from typing import Any, Dict, List
 
 from dbgpt.agent.resource.tool.base import tool
 
+from .tool_tracing import trace_agent_tool
+
 
 def make_knowledge_retrieve(react_state: Dict[str, Any], knowledge_resources: List):
     @tool(
@@ -15,6 +17,7 @@ def make_knowledge_retrieve(react_state: Dict[str, Any], knowledge_resources: Li
             'in the knowledge base. Parameters: {{"query": "search query"}}'
         )
     )
+    @trace_agent_tool("agent.knowledge_retrieve")
     async def knowledge_retrieve(query: str) -> str:
         if not knowledge_resources:
             return json.dumps(

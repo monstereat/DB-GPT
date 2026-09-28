@@ -276,14 +276,19 @@ const getInteractionConfig = (config: ChartConfig) => {
 // Get click handler config
 const getClickHandlerConfig = (config: ChartConfig, chartRef: React.MutableRefObject<any>) => {
   if (!config.onDataPointClick) return {};
+  let lastHandledClickTimestamp: number | null = null;
 
   return {
-    onReady: (plot: any) => {
-      chartRef.current = plot;
-      plot.on('element:click', (evt: any) => {
-        const { data } = evt;
-        config.onDataPointClick?.(data?.data, evt);
-      });
+    onReady: (chart: any) => {
+      chartRef.current = chart;
+    },
+    onEvent: (_chart: any, event: any) => {
+      if ((event.type !== 'click' && !event.type?.endsWith(':click')) || !event.data?.data) return;
+      if (typeof event.timeStamp === 'number') {
+        if (event.timeStamp === lastHandledClickTimestamp) return;
+        lastHandledClickTimestamp = event.timeStamp;
+      }
+      config.onDataPointClick?.(event.data?.data, event);
     },
   };
 };

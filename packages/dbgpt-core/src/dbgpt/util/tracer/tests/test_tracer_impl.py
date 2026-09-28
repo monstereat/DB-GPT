@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 
 from dbgpt.component import SystemApp
@@ -9,6 +11,7 @@ from dbgpt.util.tracer import (
     SpanStorageType,
     Tracer,
     TracerManager,
+    TracerParameters,
 )
 
 
@@ -55,6 +58,15 @@ def test_start_and_end_span(tracer: Tracer):
     assert stored_span.span_id == span.span_id
 
 
+@pytest.mark.parametrize("value", ["true", "TRUE", "True"])
+def test_tracer_parameters_enable_otlp_exporter_from_environment(monkeypatch, value):
+    monkeypatch.setenv("TRACER_TO_OPEN_TELEMETRY", value)
+
+    parameters = TracerParameters()
+
+    assert parameters.exporter == "telemetry"
+
+
 def test_start_and_end_span_with_tracer_manager(tracer_manager: TracerManager):
     span = tracer_manager.start_span("operation")
     assert isinstance(span, Span)
@@ -82,6 +94,33 @@ def test_parent_child_span_relation(tracer: Tracer):
     assert child_span.operation_name in [
         s.operation_name for s in tracer._get_current_storage().spans
     ]
+
+
+def test_parallel_async_span_stacks_are_isolated(tracer: Tracer):
+    parent_span = tracer.start_span("request")
+    ready = asyncio.Event()
+    started = 0
+
+    async def worker(operation_name: str) -> str:
+        nonlocal started
+        span = tracer.start_span(operation_name, parent_span_id=parent_span.span_id)
+        started += 1
+        if started == 2:
+            ready.set()
+        await ready.wait()
+        current_span = tracer.get_current_span()
+        assert current_span is span
+        span.end()
+        return current_span.operation_name
+
+    async def run_workers():
+        return await asyncio.gather(worker("subagent.a"), worker("subagent.b"))
+
+    results = asyncio.run(run_workers())
+
+    assert set(results) == {"subagent.a", "subagent.b"}
+    assert tracer.get_current_span() is parent_span
+    parent_span.end()
 
 
 @pytest.mark.parametrize(

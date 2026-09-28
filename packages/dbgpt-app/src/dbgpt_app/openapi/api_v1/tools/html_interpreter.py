@@ -9,6 +9,8 @@ from typing import Any, Dict, List
 
 from dbgpt.agent.resource.tool.base import tool
 
+from .tool_tracing import trace_agent_tool
+
 logger = logging.getLogger(__name__)
 
 
@@ -36,6 +38,7 @@ def make_html_interpreter(react_state: Dict[str, Any], skills_dir: str):
             '也可以用文件模式：{"file_path": "/path/to/report.html"}'
         )
     )
+    @trace_agent_tool("agent.html_interpreter")
     async def html_interpreter(
         html: str = "",
         title: str = "Report",

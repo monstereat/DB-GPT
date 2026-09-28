@@ -70,6 +70,11 @@ class ChatParam:
     prompt_code: Optional[str] = None
     ext_info: Optional[Dict[str, Any]] = None
     app_config: Optional[GPTsAppCommonConfig] = None
+    user_role: Optional[str] = None
+    tenant_id: Optional[str] = None
+    region_id: Optional[str] = None
+    token_quota_context: Optional[Dict[str, Any]] = None
+    verified_execution_context: Optional[Dict[str, Any]] = None
 
     def real_app_config(self, type_class: Type[C]) -> C:
         if self.app_config is None:
@@ -253,9 +258,14 @@ class BaseChat(ABC):
         worker_manager = self.system_app.get_component(
             ComponentType.WORKER_MANAGER_FACTORY, WorkerManagerFactory
         ).create()
-        return DefaultLLMClient(
+        llm_client = DefaultLLMClient(
             worker_manager, auto_convert_message=self.auto_convert_message
         )
+        if self._chat_param.token_quota_context:
+            from dbgpt_app.openapi.api_v1.token_quota import MeteredLLMClient
+
+            return MeteredLLMClient(llm_client, **self._chat_param.token_quota_context)
+        return llm_client
 
     async def call_llm_operator(self, request: ModelRequest) -> ModelOutput:
         llm_task = build_cached_chat_operator(self.llm_client, False, self.system_app)
@@ -408,6 +418,27 @@ class BaseChat(ABC):
     async def stream_call(
         self, text_output: bool = True, incremental: bool = False
     ) -> AsyncIterator[Union[ModelOutput, str]]:
+        token_quota_context = self._chat_param.token_quota_context
+        if token_quota_context:
+            from dbgpt.core.interface.operators.llm_operator import (
+                scoped_llm_client_wrapper,
+            )
+            from dbgpt_app.openapi.api_v1.token_quota import (
+                build_metered_llm_client_wrapper,
+            )
+
+            with scoped_llm_client_wrapper(
+                build_metered_llm_client_wrapper(token_quota_context)
+            ):
+                async for output in self._stream_call_impl(text_output, incremental):
+                    yield output
+            return
+        async for output in self._stream_call_impl(text_output, incremental):
+            yield output
+
+    async def _stream_call_impl(
+        self, text_output: bool = True, incremental: bool = False
+    ) -> AsyncIterator[Union[ModelOutput, str]]:
         # TODO Retry when server connection error
         payload = await self._build_model_request()
 
@@ -527,6 +558,22 @@ class BaseChat(ABC):
         )
 
     async def nostream_call(self):
+        token_quota_context = self._chat_param.token_quota_context
+        if token_quota_context:
+            from dbgpt.core.interface.operators.llm_operator import (
+                scoped_llm_client_wrapper,
+            )
+            from dbgpt_app.openapi.api_v1.token_quota import (
+                build_metered_llm_client_wrapper,
+            )
+
+            with scoped_llm_client_wrapper(
+                build_metered_llm_client_wrapper(token_quota_context)
+            ):
+                return await self._nostream_call_impl()
+        return await self._nostream_call_impl()
+
+    async def _nostream_call_impl(self):
         payload = await self._build_model_request()
         span = root_tracer.start_span(
             "BaseChat.nostream_call", metadata=payload.to_dict()

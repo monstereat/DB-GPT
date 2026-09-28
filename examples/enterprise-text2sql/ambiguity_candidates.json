@@ -1,0 +1,8 @@
+{
+  "a01": {"action": "clarify", "missing_fields": ["time_range", "metric"]},
+  "a02": {"action": "clarify", "missing_fields": ["metric"]},
+  "a03": {"action": "clarify", "missing_fields": ["metric", "time_range"]},
+  "a04": {"action": "clarify", "missing_fields": ["time_range"]},
+  "a05": {"action": "clarify", "missing_fields": ["metric", "time_range"]},
+  "a06": {"action": "clarify", "missing_fields": ["time_range", "comparison_basis"]}
+}

@@ -91,6 +91,25 @@ Action Input: {"result": "The answer is 4"}"""
 
         assert parser.get_final_output(steps) == "The answer is 4"
 
+    def test_terminal_action_with_plain_final_answer(self):
+        """Normalize models that omit Action Input after terminate."""
+        parser = ReActOutputParser()
+        text = """Thought: The query returned the answer.
+Action: terminate
+
+Final Answer: 第二季度华南区销售额为77000分，退款率为6.1%。"""
+
+        steps = parser.parse(text)
+
+        assert len(steps) == 1
+        assert steps[0].action == "terminate"
+        assert steps[0].action_input == {
+            "result": "第二季度华南区销售额为77000分，退款率为6.1%。"
+        }
+        assert parser.get_final_output(steps) == (
+            "第二季度华南区销售额为77000分，退款率为6.1%。"
+        )
+
     def test_multi_step_parsing(self):
         """Test parsing of multiple steps."""
         parser = ReActOutputParser()

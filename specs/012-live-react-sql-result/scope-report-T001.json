@@ -1,0 +1,30 @@
+{
+  "base_commit": "93da908aa2ba936909a70d7b083ab6455f8a0a85",
+  "baseline": "/Users/monster/Documents/GitHub/code/DB-GPT/specs/012-live-react-sql-result/scope-baseline-T001.json",
+  "new_files": [],
+  "modified_preexisting_files": [
+    "docker/compose_examples/develop-me-test/README.md",
+    "docker/compose_examples/develop-me-test/compose.yaml",
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/sql_query.py",
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/tests/test_sql_query.py"
+  ],
+  "touched_files": [
+    "docker/compose_examples/develop-me-test/README.md",
+    "docker/compose_examples/develop-me-test/compose.yaml",
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/sql_query.py",
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/tests/test_sql_query.py"
+  ],
+  "allow_patterns": [
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/sql_query.py",
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/tests/test_sql_query.py",
+    "docker/compose_examples/develop-me-test/compose.yaml",
+    "docker/compose_examples/develop-me-test/README.md",
+    "specs/012-live-react-sql-result/**"
+  ],
+  "internal_patterns": [
+    "specs/012-live-react-sql-result/**",
+    "specs/012-live-react-sql-result/scope-baseline-T001.json"
+  ],
+  "outside_scope": [],
+  "passed": true
+}

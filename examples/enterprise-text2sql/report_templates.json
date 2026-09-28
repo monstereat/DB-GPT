@@ -1,0 +1,26 @@
+{
+  "catalog_version": "1.0.0",
+  "templates": [
+    {
+      "id": "sales-standard@1.0.0",
+      "allowed_roles": ["admin", "normal", "sales"],
+      "allowed_metric_ids": ["sales_amount", "paid_refund_amount", "net_sales_amount", "refund_rate"],
+      "definition_fields": ["metric_id", "metric_version", "unit", "definition", "start_date", "end_date_exclusive", "dimension"],
+      "result_fields": ["metric_id", "metric_version", "dimension_value", "value", "unit"]
+    },
+    {
+      "id": "sales-compact@1.0.0",
+      "allowed_roles": ["admin", "normal", "sales"],
+      "allowed_metric_ids": ["sales_amount", "paid_refund_amount", "net_sales_amount", "refund_rate"],
+      "definition_fields": ["metric_id", "metric_version", "definition"],
+      "result_fields": ["metric_id", "dimension_value", "value"]
+    },
+    {
+      "id": "admin-margin@1.0.0",
+      "allowed_roles": ["admin"],
+      "allowed_metric_ids": ["sales_amount", "paid_refund_amount", "net_sales_amount", "refund_rate", "gross_margin_rate"],
+      "definition_fields": ["metric_id", "metric_version", "unit", "definition", "start_date", "end_date_exclusive", "dimension"],
+      "result_fields": ["metric_id", "metric_version", "dimension_value", "value", "unit"]
+    }
+  ]
+}

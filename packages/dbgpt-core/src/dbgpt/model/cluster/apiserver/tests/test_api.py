@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
@@ -5,6 +7,7 @@ from httpx import ASGITransport, AsyncClient
 from dbgpt.component import SystemApp
 from dbgpt.model.cluster.apiserver.api import (
     ModelList,
+    _ClosingStreamingResponse,
     api_settings,
     initialize_apiserver,
 )
@@ -59,6 +62,42 @@ async def client(request, system_app: SystemApp):
             system_app.register_instance(model_registry)
             initialize_apiserver(api_params, None, None, app, system_app)
             yield client
+
+
+@pytest.mark.asyncio
+async def test_streaming_response_closes_generator_after_disconnect():
+    body_started = asyncio.Event()
+    never = asyncio.Event()
+    closed = asyncio.Event()
+
+    async def body():
+        try:
+            yield b"event: started\n\n"
+            await never.wait()
+        finally:
+            closed.set()
+
+    async def send(message):
+        if message["type"] == "http.response.body" and message.get("more_body"):
+            body_started.set()
+            await never.wait()
+
+    async def receive():
+        await body_started.wait()
+        return {"type": "http.disconnect"}
+
+    response = _ClosingStreamingResponse(body(), media_type="text/event-stream")
+    scope = {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/v1/chat/completions",
+        "headers": [],
+        "asgi": {"version": "3.0", "spec_version": "2.0"},
+    }
+
+    await asyncio.wait_for(response(scope, receive, send), timeout=1)
+
+    assert closed.is_set()
 
 
 @pytest.mark.asyncio

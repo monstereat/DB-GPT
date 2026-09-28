@@ -1,0 +1,25 @@
+{
+  "base_commit": "93da908aa2ba936909a70d7b083ab6455f8a0a85",
+  "baseline": "/Users/monster/Documents/GitHub/code/DB-GPT/specs/014-database-react-prompt/scope-baseline-T001.json",
+  "new_files": [
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tests/test_database_workflow_prompt.py"
+  ],
+  "modified_preexisting_files": [
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/agentic_data_api.py"
+  ],
+  "touched_files": [
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tests/test_database_workflow_prompt.py",
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/agentic_data_api.py"
+  ],
+  "allow_patterns": [
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/agentic_data_api.py",
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tests/test_database_workflow_prompt.py",
+    "specs/014-database-react-prompt/**"
+  ],
+  "internal_patterns": [
+    "specs/014-database-react-prompt/**",
+    "specs/014-database-react-prompt/scope-baseline-T001.json"
+  ],
+  "outside_scope": [],
+  "passed": true
+}

@@ -10,6 +10,7 @@ import logging
 import os
 from typing import Any, Dict, Generator, List, Optional
 
+import anyio
 import shortuuid
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.exceptions import RequestValidationError
@@ -98,6 +99,19 @@ class APIServerException(Exception):
     def __init__(self, code: int, message: str):
         self.code = code
         self.message = message
+
+
+class _ClosingStreamingResponse(StreamingResponse):
+    """Close the wrapped generator after normal completion or disconnect."""
+
+    async def __call__(self, scope, receive, send) -> None:
+        try:
+            await super().__call__(scope, receive, send)
+        finally:
+            close = getattr(self.body_iterator, "aclose", None)
+            if callable(close):
+                with anyio.CancelScope(shield=True):
+                    await close()
 
 
 class APISettings(BaseModel):
@@ -739,7 +753,9 @@ async def create_chat_completion(
             request.model, params, request.n
         )
         trace_generator = root_tracer.wrapper_async_stream(generator, **trace_kwargs)
-        return StreamingResponse(trace_generator, media_type="text/event-stream")
+        return _ClosingStreamingResponse(
+            trace_generator, media_type="text/event-stream"
+        )
     else:
         with root_tracer.start_span(**trace_kwargs):
             return await api_server.chat_completion_generate(
@@ -791,7 +807,9 @@ async def create_completion(
     if request.stream:
         generator = api_server.completion_stream_generator(request, params)
         trace_generator = root_tracer.wrapper_async_stream(generator, **trace_kwargs)
-        return StreamingResponse(trace_generator, media_type="text/event-stream")
+        return _ClosingStreamingResponse(
+            trace_generator, media_type="text/event-stream"
+        )
     else:
         with root_tracer.start_span(**trace_kwargs):
             params["span_id"] = root_tracer.get_current_span_id()

@@ -1,0 +1,24 @@
+{
+  "base_commit": "93da908aa2ba936909a70d7b083ab6455f8a0a85",
+  "baseline": "/Users/monster/Documents/GitHub/code/DB-GPT/specs/018-metric-query-tenant-join/scope-baseline-T002.json",
+  "new_files": [],
+  "modified_preexisting_files": [
+    "docker/compose_examples/develop-me-test/compose.yaml",
+    "docs/develop-me-roadmap.md"
+  ],
+  "touched_files": [
+    "docker/compose_examples/develop-me-test/compose.yaml",
+    "docs/develop-me-roadmap.md"
+  ],
+  "allow_patterns": [
+    "docs/develop-me-roadmap.md",
+    "docker/compose_examples/develop-me-test/compose.yaml",
+    "specs/018-metric-query-tenant-join/**"
+  ],
+  "internal_patterns": [
+    "specs/018-metric-query-tenant-join/**",
+    "specs/018-metric-query-tenant-join/scope-baseline-T002.json"
+  ],
+  "outside_scope": [],
+  "passed": true
+}

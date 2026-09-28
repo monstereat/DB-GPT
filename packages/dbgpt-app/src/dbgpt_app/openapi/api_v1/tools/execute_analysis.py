@@ -8,13 +8,17 @@ private local paths only inside the execution process.
 """
 
 import json
+import logging
 import os
 import re
+import time
 import uuid
+from functools import wraps
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from dbgpt.agent.resource.tool.base import tool
+from dbgpt.util.tracer import SpanType, root_tracer
 
 from .code_interpreter import _run_python_file, build_execution_env
 
@@ -28,6 +32,7 @@ _WINDOWS_DEVICE_NAMES = frozenset(
     + [f"COM{i}" for i in range(1, 10)]
     + [f"LPT{i}" for i in range(1, 10)]
 )
+logger = logging.getLogger(__name__)
 
 
 def _sanitize_conv_id(value: Any) -> Optional[str]:
@@ -322,6 +327,48 @@ def _file_summary_chunk(entry: Dict[str, Any], *, include_name: bool) -> Dict[st
 
 
 def make_execute_analysis(react_state: Dict[str, Any]):
+    def trace_analysis(function):
+        @wraps(function)
+        async def traced(file_ids: Optional[List[str]] = None) -> str:
+            started_at = time.monotonic()
+            span = None
+            status = "failed"
+            try:
+                try:
+                    span = root_tracer.start_span(
+                        "agent.execute_analysis",
+                        span_type=SpanType.AGENT,
+                        metadata={
+                            "actor_user_id": react_state.get("actor_user_id"),
+                            "conversation_trace_id": react_state.get("conv_id"),
+                        },
+                    )
+                except Exception:
+                    logger.debug("Unable to start execute analysis span", exc_info=True)
+                result = await function(file_ids)
+                status = "returned"
+                return result
+            finally:
+                if span is not None:
+                    try:
+                        root_tracer.end_span(
+                            span,
+                            metadata={
+                                "actor_user_id": react_state.get("actor_user_id"),
+                                "conversation_trace_id": react_state.get("conv_id"),
+                                "status": status,
+                                "elapsed_ms": int(
+                                    (time.monotonic() - started_at) * 1000
+                                ),
+                            },
+                        )
+                    except Exception:
+                        logger.debug(
+                            "Unable to end execute analysis span", exc_info=True
+                        )
+
+        return traced
+
     @tool(
         description=(
             "Execute quick analysis on the uploaded Excel/CSV file(s). "
@@ -329,6 +376,7 @@ def make_execute_analysis(react_state: Dict[str, Any]):
             'defaults to all files selected for this turn"}'
         )
     )
+    @trace_analysis
     async def execute_analysis(file_ids: Optional[List[str]] = None) -> str:
         """Analyze the selected files; partial failures stay visible."""
         manifests = list(react_state.get("session_files") or [])

@@ -1,0 +1,18 @@
+{
+  "base_commit": "93da908aa2ba936909a70d7b083ab6455f8a0a85",
+  "baseline": "/Users/monster/Documents/GitHub/code/DB-GPT/specs/001-admin-margin-ui/scope-baseline-T001.json",
+  "new_files": [],
+  "modified_preexisting_files": [],
+  "touched_files": [],
+  "allow_patterns": [
+    "examples/enterprise-text2sql/api.py",
+    "examples/enterprise-text2sql/test_api.py",
+    "specs/001-admin-margin-ui/**"
+  ],
+  "internal_patterns": [
+    "specs/001-admin-margin-ui/**",
+    "specs/001-admin-margin-ui/scope-baseline-T001.json"
+  ],
+  "outside_scope": [],
+  "passed": true
+}

@@ -1,0 +1,131 @@
+{
+  "question_count": 10,
+  "correct": 10,
+  "incorrect": 0,
+  "missing_result": 0,
+  "invalid_result": 0,
+  "truncated": 0,
+  "incomplete_stream": 0,
+  "timeout": 0,
+  "result_accuracy": 1.0,
+  "by_category": {
+    "order_amount_analysis": {
+      "question_count": 2,
+      "correct": 2,
+      "incorrect": 0,
+      "missing_result": 0,
+      "invalid_result": 0,
+      "truncated": 0,
+      "incomplete_stream": 0,
+      "timeout": 0,
+      "accuracy": 1.0
+    },
+    "product_analysis": {
+      "question_count": 4,
+      "correct": 4,
+      "incorrect": 0,
+      "missing_result": 0,
+      "invalid_result": 0,
+      "truncated": 0,
+      "incomplete_stream": 0,
+      "timeout": 0,
+      "accuracy": 1.0
+    },
+    "refunds": {
+      "question_count": 1,
+      "correct": 1,
+      "incorrect": 0,
+      "missing_result": 0,
+      "invalid_result": 0,
+      "truncated": 0,
+      "incomplete_stream": 0,
+      "timeout": 0,
+      "accuracy": 1.0
+    },
+    "time_series": {
+      "question_count": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "missing_result": 0,
+      "invalid_result": 0,
+      "truncated": 0,
+      "incomplete_stream": 0,
+      "timeout": 0,
+      "accuracy": 1.0
+    }
+  },
+  "macro_average_accuracy": 1.0,
+  "cases": [
+    {
+      "question_id": "q11",
+      "category": "product_analysis",
+      "status": "correct",
+      "result_sha256": "ea074f3d5e24cf259b2cec4c468b1a7a12fe33ce1ee7754d9c8e92b78b7c1e0f",
+      "duration_ms": 63639
+    },
+    {
+      "question_id": "q12",
+      "category": "product_analysis",
+      "status": "correct",
+      "result_sha256": "c4099c8c7cf8eac43a6bdfa094c5552d68dd5a502995bc5d5d602deff7b4d5ed",
+      "duration_ms": 45046
+    },
+    {
+      "question_id": "q13",
+      "category": "product_analysis",
+      "status": "correct",
+      "result_sha256": "33f82575d353aaa003bb94915c04cf0d7604322640d62730f133d12d1b75440e",
+      "duration_ms": 59963
+    },
+    {
+      "question_id": "q19",
+      "category": "time_series",
+      "status": "correct",
+      "result_sha256": "526c38409d21990987f854fcc5879f394fcea093ffcc5a508193ee32a2195516",
+      "duration_ms": 64433
+    },
+    {
+      "question_id": "q20",
+      "category": "time_series",
+      "status": "correct",
+      "result_sha256": "46809905e2c6a54f0d6564ff5782fa0bcac204e6be8ab6aa395f14634a44496e",
+      "duration_ms": 55475
+    },
+    {
+      "question_id": "q21",
+      "category": "time_series",
+      "status": "correct",
+      "result_sha256": "46809905e2c6a54f0d6564ff5782fa0bcac204e6be8ab6aa395f14634a44496e",
+      "duration_ms": 50842
+    },
+    {
+      "question_id": "q23",
+      "category": "product_analysis",
+      "status": "correct",
+      "result_sha256": "59627f679a578e1d847371a35f0c2e31d2e50bcfe0099ede52f702e1982beeaf",
+      "duration_ms": 50541
+    },
+    {
+      "question_id": "q25",
+      "category": "order_amount_analysis",
+      "status": "correct",
+      "result_sha256": "4fbb4d16ac0132995ebbb2958c89bb24f5d5b7c7bb7c74e394ab0302e04d0380",
+      "duration_ms": 47447
+    },
+    {
+      "question_id": "q26",
+      "category": "order_amount_analysis",
+      "status": "correct",
+      "result_sha256": "ef498f38c9ceab612e3513aa3ed25abc6497ffbef5b28fef5103fd26599d744b",
+      "duration_ms": 49376
+    },
+    {
+      "question_id": "q27",
+      "category": "refunds",
+      "status": "correct",
+      "result_sha256": "226f14c85639b9db1bf476ef7cd0be1e15db097230785885e4d0d2f9b21bab12",
+      "duration_ms": 55422
+    }
+  ],
+  "note": "Live DB-GPT ReAct structured SQL results compared with fixed synthetic gold answers; not a production authorization certification."
+}

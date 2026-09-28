@@ -1,0 +1,21 @@
+{
+  "base_commit": "93da908aa2ba936909a70d7b083ab6455f8a0a85",
+  "baseline": "/Users/monster/Documents/GitHub/code/DB-GPT/specs/012-live-react-sql-result/scope-baseline-T002.json",
+  "new_files": [],
+  "modified_preexisting_files": [
+    "docs/develop-me-roadmap.md"
+  ],
+  "touched_files": [
+    "docs/develop-me-roadmap.md"
+  ],
+  "allow_patterns": [
+    "docs/develop-me-roadmap.md",
+    "specs/012-live-react-sql-result/**"
+  ],
+  "internal_patterns": [
+    "specs/012-live-react-sql-result/**",
+    "specs/012-live-react-sql-result/scope-baseline-T002.json"
+  ],
+  "outside_scope": [],
+  "passed": true
+}

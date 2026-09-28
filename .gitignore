@@ -167,6 +167,8 @@ thirdparty
 # next.js
 /web/.next/
 /web/out/
+/examples/enterprise-text2sql/ui/node_modules/
+/examples/enterprise-text2sql/ui/dist/
 
 # production
 /web/build

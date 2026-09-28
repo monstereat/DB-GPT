@@ -33,7 +33,9 @@ class DefaultTracer(Tracer):
         span_storage_type: SpanStorageType = SpanStorageType.ON_CREATE_END,
     ):
         super().__init__(system_app)
-        self._span_stack_var = ContextVar("span_stack", default=[])
+        self._span_stack_var: ContextVar[tuple[Span, ...]] = ContextVar(
+            "span_stack", default=()
+        )
 
         if not default_storage:
             default_storage = MemorySpanStorage(system_app)
@@ -78,8 +80,7 @@ class DefaultTracer(Tracer):
         ]:
             self.append_span(span)
         current_stack = self._span_stack_var.get()
-        current_stack.append(span)
-        self._span_stack_var.set(current_stack)
+        self._span_stack_var.set(current_stack + (span,))
 
         span.add_end_caller(self._remove_from_stack_top)
         return span
@@ -90,9 +91,15 @@ class DefaultTracer(Tracer):
 
     def _remove_from_stack_top(self, span: Span):
         current_stack = self._span_stack_var.get()
-        if current_stack:
-            current_stack.pop()
-        self._span_stack_var.set(current_stack)
+        if current_stack and current_stack[-1] is span:
+            self._span_stack_var.set(current_stack[:-1])
+            return
+        for index in range(len(current_stack) - 1, -1, -1):
+            if current_stack[index] is span:
+                self._span_stack_var.set(
+                    current_stack[:index] + current_stack[index + 1 :]
+                )
+                return
 
     def get_current_span(self) -> Optional[Span]:
         current_stack = self._span_stack_var.get()

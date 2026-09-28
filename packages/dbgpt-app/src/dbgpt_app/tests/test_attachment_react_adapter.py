@@ -810,7 +810,13 @@ async def test_react_agent_stream_closes_attachment_context_on_completion(
 ):
     from dbgpt_app.openapi.api_v1 import agentic_data_api
 
-    async def fake_inner(dialogue, tool_mode, attachment_ctx):
+    async def fake_inner(
+        dialogue,
+        tool_mode,
+        attachment_ctx,
+        database_connector=None,
+        identity_context=None,
+    ):
         yield "data: ok\n\n"
 
     monkeypatch.setattr(agentic_data_api, "_react_agent_stream_inner", fake_inner)
@@ -831,7 +837,13 @@ async def test_react_agent_stream_closes_attachment_context_on_completion(
 async def test_react_agent_stream_closes_attachment_context_on_error(monkeypatch):
     from dbgpt_app.openapi.api_v1 import agentic_data_api
 
-    async def failing_inner(dialogue, tool_mode, attachment_ctx):
+    async def failing_inner(
+        dialogue,
+        tool_mode,
+        attachment_ctx,
+        database_connector=None,
+        identity_context=None,
+    ):
         yield "data: partial\n\n"
         raise RuntimeError("agent exploded")
 
@@ -851,7 +863,13 @@ async def test_react_agent_stream_defaults_keep_legacy_call_signature(monkeypatc
 
     seen = {}
 
-    async def fake_inner(dialogue, tool_mode, attachment_ctx):
+    async def fake_inner(
+        dialogue,
+        tool_mode,
+        attachment_ctx,
+        database_connector=None,
+        identity_context=None,
+    ):
         seen["tool_mode"] = tool_mode
         seen["attachment_ctx"] = attachment_ctx
         yield "data: ok\n\n"
@@ -1204,7 +1222,9 @@ async def test_chat_react_agent_closes_attachments_when_stream_response_init_fai
             raise RuntimeError("stream init exploded")
         return real_streaming_response(*args, **kwargs)
 
-    monkeypatch.setattr(agentic_data_api, "StreamingResponse", flaky_streaming_response)
+    monkeypatch.setattr(
+        agentic_data_api, "_AgentStreamingResponse", flaky_streaming_response
+    )
 
     response = await agentic_data_api.chat_react_agent(
         _dialogue({"file_ids": [record.file_id]}),
@@ -1212,7 +1232,7 @@ async def test_chat_react_agent_closes_attachments_when_stream_response_init_fai
     )
 
     assert isinstance(response, real_streaming_response)
-    assert attempts["count"] == 2
+    assert attempts["count"] == 1
     ctx = captured["ctx"]
     assert ctx is not None
     for local_path in ctx.local_paths.values():
@@ -1243,12 +1263,14 @@ async def test_chat_knowledge_agent_closes_attachments_exactly_once_when_stream_
             raise RuntimeError("stream init exploded")
         return real_streaming_response(*args, **kwargs)
 
-    monkeypatch.setattr(agentic_data_api, "StreamingResponse", flaky_streaming_response)
+    monkeypatch.setattr(
+        agentic_data_api, "_AgentStreamingResponse", flaky_streaming_response
+    )
 
     response = await agentic_data_api.chat_knowledge_agent(
         _dialogue({}), UserRequest(user_id=OWNER)
     )
 
     assert isinstance(response, real_streaming_response)
-    assert attempts["count"] == 2
+    assert attempts["count"] == 1
     assert closable.closed == 1

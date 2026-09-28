@@ -216,10 +216,17 @@ def _bind_registry(monkeypatch, registry):
 def _patch_agent_stream(monkeypatch, captured):
     """Swap the ReAct agent executor for a fake capturing its live inputs."""
 
-    async def fake_inner(dialogue, tool_mode, attachment_ctx):
+    async def fake_inner(
+        dialogue,
+        tool_mode,
+        attachment_ctx,
+        database_connector=None,
+        identity_context=None,
+    ):
         captured["dialogue"] = dialogue
         captured["tool_mode"] = tool_mode
         captured["attachment_ctx"] = attachment_ctx
+        captured["identity_context"] = identity_context
         yield 'data: {"type":"final","content":"ok"}'
         yield 'data: {"type":"done"}'
 
@@ -646,8 +653,8 @@ async def test_scheduled_task_freezes_then_replays_immutable_inputs(env, monkeyp
 
     # ------------------------------------------------------------------
     # Every replay copies the frozen task files into a fresh run session
-    # and replays with the fresh session-scoped IDs (twice => two distinct
-    # fresh sessions, identical content hashes).
+    # and replays with fresh session-scoped IDs. The runner retains the latest
+    # run's files and reclaims the prior run's session files before each copy.
     # ------------------------------------------------------------------
     captured_payloads = []
 
@@ -675,7 +682,7 @@ async def test_scheduled_task_freezes_then_replays_immutable_inputs(env, monkeyp
     assert len(captured_payloads) == 2
 
     fresh_id_sets = []
-    for payload, run in zip(reversed(captured_payloads), runs):
+    for run_index, (payload, run) in enumerate(zip(reversed(captured_payloads), runs)):
         assert payload["conv_uid"] == run["output_conv_uid"]
         fresh_ids = payload["ext_info"]["file_ids"]
         fresh_id_sets.append(set(fresh_ids))
@@ -686,12 +693,15 @@ async def test_scheduled_task_freezes_then_replays_immutable_inputs(env, monkeyp
         run_files = env.registry.list_files(
             owner_id=OWNER, session_id=payload["conv_uid"]
         )
-        assert {f.file_id for f in run_files} == set(fresh_ids)
-        expected_sha = {
-            hashlib.sha256(content).hexdigest()
-            for content in (CSV_BYTES, b"x,y\n3,4\n")
-        }
-        assert {f.sha256 for f in run_files} == expected_sha
+        if run_index == 0:
+            assert {f.file_id for f in run_files} == set(fresh_ids)
+            expected_sha = {
+                hashlib.sha256(content).hexdigest()
+                for content in (CSV_BYTES, b"x,y\n3,4\n")
+            }
+            assert {f.sha256 for f in run_files} == expected_sha
+        else:
+            assert run_files == []
     # Two runs never share file IDs (immutability is per-run, not per-task).
     assert fresh_id_sets[0].isdisjoint(fresh_id_sets[1])
 

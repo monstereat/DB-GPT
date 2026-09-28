@@ -1,0 +1,69 @@
+{
+  "sales_q2": {
+    "metric_id": "sales_amount",
+    "metric_version": "1.0.0",
+    "start_date": "2026-04-01",
+    "end_date": "2026-07-01"
+  },
+  "refund_event_date": {
+    "metric_id": "paid_refund_amount",
+    "metric_version": "1.0.0",
+    "start_date": "2026-04-01",
+    "end_date": "2026-07-01"
+  },
+  "refund_order_cohort": {
+    "metric_id": "paid_refund_amount",
+    "metric_version": "2.0.0",
+    "start_date": "2026-06-18",
+    "end_date": "2026-06-19"
+  },
+  "net_sales_event_date": {
+    "metric_id": "net_sales_amount",
+    "metric_version": "1.0.0",
+    "start_date": "2026-04-01",
+    "end_date": "2026-07-01"
+  },
+  "net_sales_order_cohort": {
+    "metric_id": "net_sales_amount",
+    "metric_version": "2.0.0",
+    "start_date": "2026-06-18",
+    "end_date": "2026-06-19"
+  },
+  "refund_rate_event_date": {
+    "metric_id": "refund_rate",
+    "metric_version": "1.0.0",
+    "start_date": "2026-04-01",
+    "end_date": "2026-07-01"
+  },
+  "refund_rate_order_cohort": {
+    "metric_id": "refund_rate",
+    "metric_version": "2.0.0",
+    "start_date": "2026-06-18",
+    "end_date": "2026-06-19"
+  },
+  "sales_by_region": {
+    "metric_id": "sales_amount",
+    "metric_version": "1.0.0",
+    "start_date": "2026-04-01",
+    "end_date": "2026-07-01",
+    "dimension": "region"
+  },
+  "gross_margin_admin": {
+    "metric_id": "gross_margin_rate",
+    "metric_version": "1.0.0",
+    "start_date": "2026-04-01",
+    "end_date": "2026-07-01"
+  },
+  "gross_margin_non_admin": {
+    "metric_id": "gross_margin_rate",
+    "metric_version": "1.0.0",
+    "start_date": "2026-04-01",
+    "end_date": "2026-07-01"
+  },
+  "gross_margin_zero_sales": {
+    "metric_id": "gross_margin_rate",
+    "metric_version": "1.0.0",
+    "start_date": "2026-10-01",
+    "end_date": "2026-11-01"
+  }
+}

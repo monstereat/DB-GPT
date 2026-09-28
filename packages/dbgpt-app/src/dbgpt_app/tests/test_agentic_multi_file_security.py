@@ -707,7 +707,13 @@ async def test_cancelled_stream_closes_attachments_exactly_once(env, monkeypatch
     for path in list(paths.values()) + [files_json]:
         assert Path(path).exists()
 
-    async def fake_inner(dialogue, tool_mode, attachment_ctx):
+    async def fake_inner(
+        dialogue,
+        tool_mode,
+        attachment_ctx,
+        database_connector=None,
+        identity_context=None,
+    ):
         yield 'data: {"type":"chunk","content":"first"}\n\n'
         yield 'data: {"type":"final","content":"never reached"}\n\n'
 

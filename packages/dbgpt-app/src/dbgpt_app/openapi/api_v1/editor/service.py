@@ -12,6 +12,8 @@ from dbgpt.core.interface.message import (
     StorageConversation,
     _split_messages_by_round,
 )
+from dbgpt.datasource.sql_guard import execute_read_only_query
+from dbgpt_app.openapi.api_v1.business_context import prepare_database_query
 from dbgpt_app.openapi.api_view_model import Result
 from dbgpt_app.openapi.editor_view_model import (
     ChartDetail,
@@ -155,7 +157,12 @@ class EditorService(BaseComponent):
                     return chart_list
 
     def get_editor_chart_info(
-        self, conv_uid: str, chart_title: str, cfg: Config
+        self,
+        conv_uid: str,
+        chart_title: str,
+        cfg: Config,
+        audit_context: Optional[Dict] = None,
+        verified_execution_context: Optional[Dict] = None,
     ) -> Result[ChartDetail]:
         storage_conv: StorageConversation = self.get_storage_conv(conv_uid)
         messages_by_round = _split_messages_by_round(storage_conv.messages)
@@ -183,6 +190,19 @@ class EditorService(BaseComponent):
                     )[0]
 
                     conn = cfg.local_db_manager.get_connector(db_name)
+                    try:
+                        scoped_sql, scoped_audit_context = prepare_database_query(
+                            find_chart["chart_sql"], audit_context or {}, conn
+                        )
+                        query_result = execute_read_only_query(
+                            conn,
+                            scoped_sql,
+                            audit_context=scoped_audit_context,
+                            verified_execution_context=verified_execution_context,
+                            span_name="editor.chart_replay",
+                        )
+                    except (ValueError, TimeoutError) as e:
+                        return Result.failed(msg=str(e))
                     detail: ChartDetail = ChartDetail(
                         chart_uid=find_chart["chart_uid"],
                         chart_type=find_chart["chart_type"],
@@ -191,7 +211,7 @@ class EditorService(BaseComponent):
                         db_name=db_name,
                         chart_name=find_chart["chart_name"],
                         chart_value=find_chart["values"],
-                        table_value=conn.run(find_chart["chart_sql"]),
+                        table_value=[query_result.columns, *query_result.rows],
                     )
                     return Result.succ(detail)
         return Result.failed(msg="Can't Find Chart Detail Info!")

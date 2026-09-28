@@ -1,7 +1,11 @@
+import json
+import os
+from dataclasses import dataclass
 from functools import cache
+from hmac import compare_digest
 from typing import List, Optional, Union
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from fastapi.security.http import HTTPAuthorizationCredentials, HTTPBearer
 
 from dbgpt.component import SystemApp
@@ -13,6 +17,12 @@ from dbgpt_serve.datasource.api.schemas import (
 )
 from dbgpt_serve.datasource.config import SERVE_SERVICE_COMPONENT_NAME, ServeConfig
 from dbgpt_serve.datasource.service.service import Service
+from dbgpt_serve.utils.auth import (
+    UserRequest,
+    get_user_from_headers,
+    local_demo_execution_context,
+    trusted_agent_execution_context,
+)
 
 router = APIRouter()
 
@@ -27,6 +37,79 @@ def get_service() -> Service:
 
 
 get_bearer_token = HTTPBearer(auto_error=False)
+
+
+@dataclass(frozen=True)
+class DatasourceActor:
+    actor_id: Optional[str]
+    is_admin: bool
+    authentication: str
+
+
+def get_datasource_actor(
+    authorization: Optional[str] = Header(None),
+    user_id: Optional[str] = Header(None),
+    service: Service = Depends(get_service),
+) -> DatasourceActor:
+    """Require verified OIDC identity or an explicitly configured service key."""
+    scheme, separator, token = (authorization or "").partition(" ")
+    bearer_token = token.strip() if separator and scheme.lower() == "bearer" else ""
+
+    if bearer_token:
+        for api_key in _parse_api_keys(service.config.api_keys or ""):
+            if compare_digest(bearer_token, api_key):
+                return DatasourceActor(
+                    actor_id=None, is_admin=True, authentication="service_api_key"
+                )
+
+    credentials = (
+        HTTPAuthorizationCredentials(scheme=scheme, credentials=bearer_token)
+        if bearer_token
+        else None
+    )
+    user_info: UserRequest = get_user_from_headers(
+        user_id=user_id, credentials=credentials
+    )
+    if not trusted_agent_execution_context(user_info):
+        raise HTTPException(
+            status_code=401,
+            detail="Verified OIDC identity or configured service API key required",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return DatasourceActor(
+        actor_id=user_info.user_id,
+        is_admin=user_info.role == "admin",
+        authentication="verified_oidc_jwt",
+    )
+
+
+def get_datasource_list_actor(
+    authorization: Optional[str] = Header(None),
+    user_id: Optional[str] = Header(None),
+    service: Service = Depends(get_service),
+) -> DatasourceActor:
+    """Allow local identity to list only configured synthetic demo sources."""
+    try:
+        return get_datasource_actor(authorization, user_id, service)
+    except HTTPException as error:
+        if authorization:
+            raise
+        user_info = get_user_from_headers(user_id=user_id, credentials=None)
+        try:
+            configured = json.loads(os.getenv("DBGPT_LOCAL_DEMO_DATASOURCES", "{}"))
+        except json.JSONDecodeError:
+            configured = {}
+        if isinstance(configured, dict) and any(
+            isinstance(db_name, str)
+            and local_demo_execution_context(user_info, db_name)
+            for db_name in configured
+        ):
+            return DatasourceActor(
+                actor_id=user_info.user_id,
+                is_admin=False,
+                authentication="local_demo",
+            )
+        raise error
 
 
 @cache
@@ -99,11 +182,11 @@ async def test_auth():
 @router.post(
     "/datasources",
     response_model=Result[DatasourceQueryResponse],
-    dependencies=[Depends(check_api_key)],
 )
 async def create(
     request: Union[DatasourceCreateRequest, DatasourceServeRequest],
     service: Service = Depends(get_service),
+    actor: DatasourceActor = Depends(get_datasource_actor),
 ) -> Result[DatasourceQueryResponse]:
     """Create a new Space entity
 
@@ -114,18 +197,20 @@ async def create(
     Returns:
         ServerResponse: The response
     """
-    res = await blocking_func_to_async(global_system_app, service.create, request)
+    res = await blocking_func_to_async(
+        global_system_app, service.create, request, actor_id=actor.actor_id
+    )
     return Result.succ(res)
 
 
 @router.put(
     "/datasources",
     response_model=Result[DatasourceQueryResponse],
-    dependencies=[Depends(check_api_key)],
 )
 async def update(
     request: Union[DatasourceCreateRequest, DatasourceServeRequest],
     service: Service = Depends(get_service),
+    actor: DatasourceActor = Depends(get_datasource_actor),
 ) -> Result[DatasourceQueryResponse]:
     """Update a Space entity
 
@@ -135,17 +220,24 @@ async def update(
     Returns:
         ServerResponse: The response
     """
-    res = await blocking_func_to_async(global_system_app, service.update, request)
+    res = await blocking_func_to_async(
+        global_system_app,
+        service.update,
+        request,
+        actor_id=actor.actor_id,
+        is_admin=actor.is_admin,
+    )
     return Result.succ(res)
 
 
 @router.delete(
     "/datasources/{datasource_id}",
     response_model=Result[None],
-    dependencies=[Depends(check_api_key)],
 )
 async def delete(
-    datasource_id: str, service: Service = Depends(get_service)
+    datasource_id: str,
+    service: Service = Depends(get_service),
+    actor: DatasourceActor = Depends(get_datasource_actor),
 ) -> Result[None]:
     """Delete a Space entity
 
@@ -155,17 +247,24 @@ async def delete(
     Returns:
         ServerResponse: The response
     """
-    await blocking_func_to_async(global_system_app, service.delete, datasource_id)
+    await blocking_func_to_async(
+        global_system_app,
+        service.delete,
+        datasource_id,
+        actor_id=actor.actor_id,
+        is_admin=actor.is_admin,
+    )
     return Result.succ(None)
 
 
 @router.get(
     "/datasources/{datasource_id}",
-    dependencies=[Depends(check_api_key)],
     response_model=Result[DatasourceQueryResponse],
 )
 async def query(
-    datasource_id: str, service: Service = Depends(get_service)
+    datasource_id: str,
+    service: Service = Depends(get_service),
+    actor: DatasourceActor = Depends(get_datasource_actor),
 ) -> Result[DatasourceQueryResponse]:
     """Query Space entities
 
@@ -175,13 +274,18 @@ async def query(
     Returns:
         List[ServeResponse]: The response
     """
-    res = await blocking_func_to_async(global_system_app, service.get, datasource_id)
+    res = await blocking_func_to_async(
+        global_system_app,
+        service.get,
+        datasource_id,
+        actor_id=actor.actor_id,
+        is_admin=actor.is_admin,
+    )
     return Result.succ(res)
 
 
 @router.get(
     "/datasources",
-    dependencies=[Depends(check_api_key)],
     response_model=Result[List[DatasourceQueryResponse]],
 )
 async def query_page(
@@ -189,6 +293,7 @@ async def query_page(
         None, description="Database type, e.g. sqlite, mysql, etc."
     ),
     service: Service = Depends(get_service),
+    actor: DatasourceActor = Depends(get_datasource_list_actor),
 ) -> Result[List[DatasourceQueryResponse]]:
     """Query Space entities
 
@@ -198,18 +303,30 @@ async def query_page(
         ServerResponse: The response
     """
     res = await blocking_func_to_async(
-        global_system_app, service.get_list, db_type=db_type
+        global_system_app,
+        service.get_list,
+        db_type=db_type,
+        actor_id=actor.actor_id,
+        is_admin=actor.is_admin,
     )
+    if actor.authentication == "local_demo":
+        local_user = UserRequest(user_id=actor.actor_id, role="admin")
+        res = [
+            item
+            for item in res
+            if item.approval_status == "approved"
+            and local_demo_execution_context(local_user, item.db_name)
+        ]
     return Result.succ(res)
 
 
 @router.get(
     "/datasource-types",
-    dependencies=[Depends(check_api_key)],
     response_model=Result[ResourceTypes],
 )
 async def get_datasource_types(
     service: Service = Depends(get_service),
+    _: DatasourceActor = Depends(get_datasource_actor),
 ) -> Result[ResourceTypes]:
     """Get the datasource types."""
     res = await blocking_func_to_async(global_system_app, service.datasource_types)
@@ -218,11 +335,12 @@ async def get_datasource_types(
 
 @router.post(
     "/datasources/test-connection",
-    dependencies=[Depends(check_api_key)],
     response_model=Result[bool],
 )
 async def test_connection(
-    request: DatasourceCreateRequest, service: Service = Depends(get_service)
+    request: DatasourceCreateRequest,
+    service: Service = Depends(get_service),
+    _: DatasourceActor = Depends(get_datasource_actor),
 ) -> Result[bool]:
     """Test the connection using datasource configuration before creating it
 
@@ -244,11 +362,12 @@ async def test_connection(
 
 @router.post(
     "/datasources/{datasource_id}/refresh",
-    dependencies=[Depends(check_api_key)],
     response_model=Result[bool],
 )
 async def refresh_datasource(
-    datasource_id: str, service: Service = Depends(get_service)
+    datasource_id: str,
+    service: Service = Depends(get_service),
+    actor: DatasourceActor = Depends(get_datasource_actor),
 ) -> Result[bool]:
     """Refresh a datasource by its ID
 
@@ -263,7 +382,11 @@ async def refresh_datasource(
         HTTPException: When the refresh operation fails
     """
     res = await blocking_func_to_async(
-        global_system_app, service.refresh, datasource_id
+        global_system_app,
+        service.refresh,
+        datasource_id,
+        actor_id=actor.actor_id,
+        is_admin=actor.is_admin,
     )
     return Result.succ(res)
 

@@ -1,0 +1,145 @@
+{
+  "catalog_version": "1.2.0",
+  "effective_from": "2026-09-25",
+  "default_year": 2026,
+  "currency": "CNY",
+  "default_metric_versions": {
+    "sales_amount": "1.0.0",
+    "paid_refund_amount": "1.0.0",
+    "net_sales_amount": "1.0.0",
+    "refund_rate": "1.0.0",
+    "gross_margin_rate": "1.0.0"
+  },
+  "metrics": [
+    {
+      "id": "sales_amount",
+      "version": "1.0.0",
+      "name": "销售额",
+      "aliases": ["总销售额", "销售总额", "完成订单销售总额", "订单销售额", "sales total", "sales amount"],
+      "calculation": "sum",
+      "source_table": "orders",
+      "amount_column": "total_cents",
+      "date_column": "created_at",
+      "status_column": "status",
+      "status_value": "completed",
+      "unit": "CNY_cent",
+      "definition": "按下单日期统计已完成订单的订单金额；取消订单不计入。"
+    },
+    {
+      "id": "paid_refund_amount",
+      "version": "1.0.0",
+      "name": "已支付退款额",
+      "aliases": ["退款金额", "退款总额", "已支付退款金额", "已支付退款总额", "退款金额总额", "refund amount", "refund total"],
+      "calculation": "sum",
+      "source_table": "refunds",
+      "amount_column": "amount_cents",
+      "date_column": "created_at",
+      "status_column": "status",
+      "status_value": "paid",
+      "unit": "CNY_cent",
+      "definition": "按退款发生日期统计已支付退款金额；区域归属取原订单区域。"
+    },
+    {
+      "id": "paid_refund_amount",
+      "version": "2.0.0",
+      "name": "已支付退款额",
+      "aliases": ["退款金额", "退款总额", "已支付退款金额", "已支付退款总额", "退款金额总额", "refund amount", "refund total"],
+      "calculation": "sum",
+      "source_table": "refunds",
+      "amount_column": "amount_cents",
+      "date_column": "created_at",
+      "period_table": "orders",
+      "period_date_column": "created_at",
+      "status_column": "status",
+      "status_value": "paid",
+      "unit": "CNY_cent",
+      "definition": "按原订单下单日期统计已支付退款金额；用于订单 cohort 分析，区域归属取原订单区域。"
+    },
+    {
+      "id": "net_sales_amount",
+      "version": "1.0.0",
+      "name": "净销售额",
+      "aliases": ["net sales", "净额销售"],
+      "calculation": "subtract",
+      "dependencies": ["sales_amount", "paid_refund_amount"],
+      "dependency_versions": {
+        "sales_amount": "1.0.0",
+        "paid_refund_amount": "1.0.0"
+      },
+      "unit": "CNY_cent",
+      "definition": "同一时间范围的已完成订单销售额减去已支付退款额；无退款时按零退款计算。"
+    },
+    {
+      "id": "net_sales_amount",
+      "version": "2.0.0",
+      "name": "净销售额",
+      "aliases": ["net sales", "净额销售"],
+      "calculation": "subtract",
+      "dependencies": ["sales_amount", "paid_refund_amount"],
+      "dependency_versions": {
+        "sales_amount": "1.0.0",
+        "paid_refund_amount": "2.0.0"
+      },
+      "unit": "CNY_cent",
+      "definition": "按原订单下单日期归属的 cohort 统计：已完成订单销售额减去这些订单对应的已支付退款额；不受退款发生日期影响。"
+    },
+    {
+      "id": "refund_rate",
+      "version": "1.0.0",
+      "name": "退款率",
+      "aliases": ["退款比例", "refund rate"],
+      "calculation": "percentage_ratio",
+      "dependencies": ["paid_refund_amount", "sales_amount"],
+      "dependency_versions": {
+        "paid_refund_amount": "1.0.0",
+        "sales_amount": "1.0.0"
+      },
+      "precision": 2,
+      "unit": "percent",
+      "zero_denominator": "null",
+      "definition": "同一时间范围内已支付退款额除以已完成订单销售额；分母为零时返回空值。"
+    },
+    {
+      "id": "refund_rate",
+      "version": "2.0.0",
+      "name": "退款率",
+      "aliases": ["退款比例", "refund rate"],
+      "calculation": "percentage_ratio",
+      "dependencies": ["paid_refund_amount", "sales_amount"],
+      "dependency_versions": {
+        "paid_refund_amount": "2.0.0",
+        "sales_amount": "1.0.0"
+      },
+      "precision": 2,
+      "unit": "percent",
+      "zero_denominator": "null",
+      "definition": "按原订单下单日期归属的 cohort 计算：这些订单对应的已支付退款额除以同 cohort 已完成订单销售额；不受退款发生日期影响。"
+    },
+    {
+      "id": "gross_margin_rate",
+      "version": "1.0.0",
+      "name": "毛利率",
+      "aliases": ["gross margin", "gross margin rate"],
+      "calculation": "gross_margin_rate",
+      "precision": 2,
+      "allowed_roles": ["admin"],
+      "unit": "percent",
+      "definition": "按订单日期统计已完成订单明细：销售额为 quantity × unit_price_cents，商品成本为 quantity × products.internal_cost_cents；毛利率为 (销售额 − 成本) ÷ 销售额 × 100%，退款不冲减，销售额为零时返回空值。仅 admin 可查询。"
+    }
+  ],
+  "dimensions": {
+    "region": {
+      "name": "销售区域",
+      "table": "regions",
+      "column": "name"
+    },
+    "area": {
+      "name": "销售大区",
+      "table": "regions",
+      "column": "area",
+      "join_column": "region_id",
+      "allowed_values": ["South China"],
+      "aliases": {"South China": ["华南", "华南区", "south china"]}
+    }
+  }
+}

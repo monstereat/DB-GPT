@@ -9,6 +9,7 @@ from dbgpt.agent import Action, ActionOutput, AgentResource, ResourceType
 from dbgpt.agent.core.agent import AgentMessage
 from dbgpt.component import ComponentType
 from dbgpt.vis.tags.vis_volatility_analysis import Vis, VisVolatilityAnalysis
+from dbgpt_serve.utils.token_quota import reject_unmetered_model_call
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +88,7 @@ class VolatilityAnalysisAction(Action[VolatilityAnalysisInput]):
             )
 
         try:
+            reject_unmetered_model_call("volatility analysis sub-agent")
             from dbgpt._private.config import Config
             from dbgpt.agent import AgentContext, AgentMemory, LLMConfig
             from dbgpt.agent.core.agent_manage import get_agent_manager

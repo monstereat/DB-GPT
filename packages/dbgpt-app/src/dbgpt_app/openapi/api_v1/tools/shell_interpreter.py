@@ -8,6 +8,8 @@ from typing import Any, Dict, List
 
 from dbgpt.agent.resource.tool.base import tool
 
+from .tool_tracing import trace_agent_tool
+
 logger = logging.getLogger(__name__)
 
 
@@ -22,6 +24,7 @@ def make_shell_interpreter(react_state: Dict[str, Any]):
             'Parameters: {"code": "shell command(s) to execute"}'
         )
     )
+    @trace_agent_tool("agent.shell_interpreter")
     async def shell_interpreter(code: str) -> str:
         """Execute shell/bash commands in a sandboxed environment."""
         if not code or not code.strip():

@@ -1,0 +1,25 @@
+[
+  {
+    "id": "q01",
+    "question": "第二季度各地区销售额是多少？",
+    "sql": "SELECT r.name AS region, SUM(o.total_cents) AS sales_cents FROM orders o JOIN regions r ON r.region_id=o.region_id WHERE o.created_at >= '2026-04-01' AND o.created_at < '2026-07-01' AND o.status='completed' GROUP BY r.name ORDER BY sales_cents DESC",
+    "expected": {
+      "columns": [
+        "region",
+        "sales_cents"
+      ],
+      "rows": [
+        [
+          "Guangzhou",
+          45000
+        ],
+        [
+          "Shenzhen",
+          32000
+        ]
+      ]
+    },
+    "category": "regional_sales",
+    "order_sensitive": false
+  }
+]

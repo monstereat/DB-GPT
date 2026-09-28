@@ -21,10 +21,11 @@ def _ensure_pilot_workspace(dest_root: str) -> None:
         dest_root (str): The destination root directory (parent of meta_data/).
             Example: ~/.dbgpt/workspace/pilot/
     """
-    template_dir = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        "pilot_template",
-    )
+    package_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    template_dir = os.path.join(package_root, "pilot_template")
+    if not os.path.isdir(template_dir):
+        repo_root = os.path.abspath(os.path.join(package_root, "..", "..", "..", ".."))
+        template_dir = os.path.join(repo_root, "pilot")
     for src_dir, dirs, files in os.walk(template_dir):
         dirs[:] = [d for d in dirs if d not in ("__pycache__", "versions")]
         for filename in files:

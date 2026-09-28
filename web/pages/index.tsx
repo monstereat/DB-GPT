@@ -54,6 +54,7 @@ import { buildActionDisplayText } from '@/utils/action-display';
 import axios from '@/utils/ctx-axios';
 import { createSummaryPresentation, type SummaryPresentation } from '@/utils/final-presentation';
 import { decodeFinalEvent, decodeHistoryAnswer, type AgentCitation } from '@/utils/react-agent-final';
+import { buildSqlResultView } from '@/utils/react-sql-result';
 import { sendGetRequest, sendSpacePostRequest } from '@/utils/request';
 import {
   ApiOutlined,
@@ -1081,11 +1082,10 @@ const Playground: NextPage = () => {
           db_type: item.type,
         })) as DataSource[];
       }
-      return [];
     } catch (e) {
       console.error('Failed to fetch datasources', e);
-      return [];
     }
+    return [];
   });
 
   // Fetch Knowledge Bases
@@ -2076,7 +2076,7 @@ const Playground: NextPage = () => {
     };
 
     try {
-      const response = await fetch(`${process.env.API_BASE_URL ?? ''}/api/v1/chat/react-agent`, {
+      const response = await fetch('/api/agent-stream', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2108,6 +2108,7 @@ const Playground: NextPage = () => {
       const reader = response.body.getReader();
       const decoder = new TextDecoder('utf-8');
       let buffer = '';
+      let receivedDoneEvent = false;
 
       const processEvent = (raw: string) => {
         if (taskEpochRef.current !== taskEpoch || conversationIdRef.current !== currentConvId) return;
@@ -2394,6 +2395,27 @@ const Playground: NextPage = () => {
             });
             return { ...prev, [responseId]: { ...current, steps: nextSteps } };
           });
+        } else if (payload.type === 'step.result') {
+          const id = payload.id;
+          if (!id || terminatedStepIdsRef.current.has(id) || !buildSqlResultView(payload.result)) {
+            return;
+          }
+          setExecutionMap(prev => {
+            const current = prev[responseId];
+            if (!current) return prev;
+            const existing = current.outputs[id] || [];
+            if (existing.some(output => output.output_type === 'sql_result')) return prev;
+            return {
+              ...prev,
+              [responseId]: {
+                ...current,
+                outputs: {
+                  ...current.outputs,
+                  [id]: [...existing, { output_type: 'sql_result', content: payload.result }],
+                },
+              },
+            };
+          });
         } else if (payload.type === 'step.chunk') {
           const id = payload.id;
           if (terminatedStepIdsRef.current.has(id || '')) return;
@@ -2489,6 +2511,7 @@ const Playground: NextPage = () => {
             uploadedFilePath: filesAttachedThisSend?.legacyFile?.file_path ?? null,
           });
         } else if (payload.type === 'done') {
+          receivedDoneEvent = true;
           setLoading(false);
         }
       };
@@ -2501,6 +2524,9 @@ const Playground: NextPage = () => {
         const parts = buffer.split('\n\n');
         buffer = parts.pop() || '';
         parts.forEach(processEvent);
+      }
+      if (!receivedDoneEvent && !controller.signal.aborted) {
+        throw new Error('响应连接中断，请重试。');
       }
     } catch (err: any) {
       if (err?.name === 'AbortError' || controller.signal.aborted) {
@@ -2535,6 +2561,15 @@ const Playground: NextPage = () => {
       } else {
         if (taskEpochRef.current !== taskEpoch || conversationIdRef.current !== currentConvId) return;
         message.error(err?.message || 'Failed to get response');
+        setExecutionMap(prev => {
+          const current = prev[responseId];
+          if (!current) return prev;
+          const nextSteps = current.steps.map(item =>
+            item.status === 'running' ? { ...item, status: 'failed' as const } : item,
+          );
+          return { ...prev, [responseId]: { ...current, steps: nextSteps } };
+        });
+        setTaskPlan([]);
         setMessages(prev => {
           const newMessages = [...prev];
           const lastMsg = newMessages[newMessages.length - 1];
@@ -3056,6 +3091,16 @@ const Playground: NextPage = () => {
                     const isCurrentRoundCollapsed = !isLastRound && !isSelected;
 
                     const execution = round.viewMsg?.id ? executionMap[round.viewMsg.id] : undefined;
+                    const conversationSqlResults = execution
+                      ? execution.steps.flatMap(step =>
+                          (execution.outputs[step.id] || [])
+                            .filter(output => output.output_type === 'sql_result')
+                            .map((output, outputIndex) => ({
+                              id: `${step.id}-sql-result-${outputIndex}`,
+                              content: output.content,
+                            })),
+                        )
+                      : [];
                     const {
                       sections,
                       activeStep: _activeStep,
@@ -3126,6 +3171,7 @@ const Playground: NextPage = () => {
                         taskPlan={round.viewMsg?.taskPlan}
                         attachedConnectors={round.humanMsg?.attachedConnectors}
                         assistantText={roundAssistantText}
+                        sqlResults={conversationSqlResults}
                         isAssistantStreaming={isPresentingThisRound && !_summaryComplete}
                         citationIndexes={roundCitations.map(citation => citation.index)}
                         onReferencesClick={

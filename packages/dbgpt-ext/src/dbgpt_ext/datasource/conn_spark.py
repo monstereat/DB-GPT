@@ -1,6 +1,7 @@
 """Spark Connector."""
 
 import logging
+import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Optional, Type
 
@@ -11,6 +12,7 @@ from dbgpt.core.awel.flow import (
 )
 from dbgpt.datasource.base import BaseConnector
 from dbgpt.datasource.parameter import BaseDatasourceParameters
+from dbgpt.datasource.sql_guard import sql_fingerprint
 from dbgpt.util.i18n_utils import _
 
 if TYPE_CHECKING:
@@ -124,14 +126,29 @@ class SparkConnector(BaseConnector):
 
     def run(self, sql: str, fetch: str = "all"):
         """Execute sql command."""
-        logger.info(f"spark sql to run is {sql}")
-        self.df.createOrReplaceTempView(self.table_name)
-        df = self.spark_session.sql(sql)
-        first_row = df.first()
-        rows = [first_row.asDict().keys()]
-        for row in df.collect():
-            rows.append(row)
-        return rows
+        started_at = time.monotonic()
+        status = "failed"
+        returned_rows = 0
+        fingerprint = sql_fingerprint(sql)
+        try:
+            self.df.createOrReplaceTempView(self.table_name)
+            df = self.spark_session.sql(sql)
+            first_row = df.first()
+            rows = [first_row.asDict().keys()]
+            for row in df.collect():
+                rows.append(row)
+            status = "succeeded"
+            returned_rows = max(0, len(rows) - 1)
+            return rows
+        finally:
+            logger.info(
+                "spark_sql_audit query_sha256=%s status=%s duration_ms=%s "
+                "returned_rows=%s",
+                fingerprint,
+                status,
+                int((time.monotonic() - started_at) * 1000),
+                returned_rows,
+            )
 
     def query_ex(self, sql: str, timeout: Optional[float] = None):
         """Execute sql command."""

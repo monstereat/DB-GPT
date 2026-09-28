@@ -75,7 +75,9 @@ class LLMExtractor(ExtractorBase, ABC):
             logger.info(f"Using model {self._model_name} to extract")
 
         model_messages = ModelMessage.from_base_messages(messages)
-        request = ModelRequest(model=self._model_name, messages=model_messages)
+        request = ModelRequest(
+            model=self._model_name, messages=model_messages, max_new_tokens=128
+        )
         response = await self._llm_client.generate(request=request)
 
         if not response.success:

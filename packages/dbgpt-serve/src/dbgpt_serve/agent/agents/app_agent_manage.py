@@ -122,6 +122,11 @@ class AppManager(BaseComponent, ABC):
             ).create(),
             auto_convert_message=True,
         )
+        from dbgpt.core.interface.operators.llm_operator import (
+            wrap_llm_client_for_current_context,
+        )
+
+        llm_provider = wrap_llm_client_for_current_context(llm_provider)
 
         # init team employees
         # TODO employee has it own llm provider

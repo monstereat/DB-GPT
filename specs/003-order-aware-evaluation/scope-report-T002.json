@@ -1,0 +1,20 @@
+{
+  "base_commit": "93da908aa2ba936909a70d7b083ab6455f8a0a85",
+  "baseline": "/Users/monster/Documents/GitHub/code/DB-GPT/specs/003-order-aware-evaluation/scope-baseline-T002-final.json",
+  "new_files": [],
+  "modified_preexisting_files": [],
+  "touched_files": [],
+  "allow_patterns": [
+    "docs/develop-me-roadmap.md",
+    "examples/enterprise-text2sql/README.md",
+    "specs/003-order-aware-evaluation/verify.md",
+    "specs/003-order-aware-evaluation/tasks.md",
+    "specs/003-order-aware-evaluation/**"
+  ],
+  "internal_patterns": [
+    "specs/003-order-aware-evaluation/**",
+    "specs/003-order-aware-evaluation/scope-baseline-T002-final.json"
+  ],
+  "outside_scope": [],
+  "passed": true
+}

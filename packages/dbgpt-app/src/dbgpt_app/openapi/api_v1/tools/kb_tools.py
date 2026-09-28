@@ -8,6 +8,8 @@ from typing import List
 
 from dbgpt.agent.resource.tool.base import tool
 
+from .tool_tracing import trace_agent_tool
+
 
 def make_kb_ls(knowledge_id: str):
     """Create a kb_ls tool bound to a specific knowledge space."""
@@ -21,6 +23,7 @@ def make_kb_ls(knowledge_id: str):
             'Parameters: {{"path": "directory path (optional, default root)"}}'
         ),
     )
+    @trace_agent_tool("agent.kb_ls")
     async def _kb_ls(path: str = "") -> str:
         from dbgpt_serve.rag.tools.kb_file_tools import kb_ls as _impl
 
@@ -41,6 +44,7 @@ def make_kb_glob(knowledge_id: str):
             'Parameters: {{"pattern": "file name keyword or glob pattern"}}'
         ),
     )
+    @trace_agent_tool("agent.kb_glob")
     async def _kb_glob(pattern: str) -> str:
         from dbgpt_serve.rag.tools.kb_file_tools import kb_glob as _impl
 
@@ -63,6 +67,7 @@ def make_kb_grep(knowledge_id: str):
             '"file_pattern": "file pattern like *.py (optional)"}}'
         ),
     )
+    @trace_agent_tool("agent.kb_grep")
     async def _kb_grep(
         query: str,
         path: str = "",
@@ -93,6 +98,7 @@ def make_kb_cat(knowledge_id: str):
             '"end_line": "end line number (optional, 0 = to end)"}}'
         ),
     )
+    @trace_agent_tool("agent.kb_cat")
     async def _kb_cat(
         path: str,
         start_line: int = 1,
@@ -125,6 +131,7 @@ def make_kb_semantic_search(knowledge_id: str):
             '"top_k": "number of results (optional, default 5)"}}'
         ),
     )
+    @trace_agent_tool("agent.semantic_search")
     async def _semantic_search(
         query: str,
         top_k: int = 5,
@@ -153,6 +160,7 @@ def make_kb_codegraph_explore(knowledge_id: str):
             'Parameters: {{"query": "class/function name or \'who calls X\'"}}'
         ),
     )
+    @trace_agent_tool("agent.kb_codegraph_explore")
     async def _kb_codegraph_explore(query: str) -> str:
         from dbgpt_serve.rag.tools.codegraph_tools import kb_codegraph_explore as _impl
 
@@ -174,6 +182,7 @@ def make_kb_codegraph_call_chain(knowledge_id: str):
             '"direction": "callers or callees (optional, default callers)"}}'
         ),
     )
+    @trace_agent_tool("agent.kb_codegraph_call_chain")
     async def _kb_codegraph_call_chain(
         function_name: str,
         depth: int = 2,
@@ -204,6 +213,7 @@ def make_kb_codegraph_class_hierarchy(knowledge_id: str):
             'Parameters: {{"class_name": "class or interface name"}}'
         ),
     )
+    @trace_agent_tool("agent.kb_codegraph_class_hierarchy")
     async def _kb_codegraph_class_hierarchy(class_name: str) -> str:
         from dbgpt_serve.rag.tools.codegraph_tools import (
             kb_codegraph_class_hierarchy as _impl,

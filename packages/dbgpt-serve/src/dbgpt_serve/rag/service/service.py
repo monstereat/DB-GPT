@@ -30,6 +30,10 @@ from dbgpt_ext.rag.assembler import EmbeddingAssembler
 from dbgpt_ext.rag.chunk_manager import ChunkParameters
 from dbgpt_ext.rag.knowledge import KnowledgeFactory
 from dbgpt_serve.core import BaseService, blocking_func_to_async
+from dbgpt_serve.utils.token_quota import (
+    daily_token_quota_enabled,
+    reject_unmetered_model_call,
+)
 
 from ..api.schemas import (
     ChunkServeRequest,
@@ -230,6 +234,12 @@ class Service(BaseService[KnowledgeSpaceEntity, SpaceServeRequest, SpaceServeRes
                 raise Exception(
                     f" doc:{doc.doc_name} status is {doc.status}, can not sync"
                 )
+            if daily_token_quota_enabled():
+                space = self.get({"id": space_id}) if space_id else None
+                if space is None and doc.space:
+                    space = self.get({"name": doc.space})
+                if space and space.vector_type == "KnowledgeGraph":
+                    reject_unmetered_model_call("KnowledgeGraph document indexing")
             chunk_parameters = sync_request.chunk_parameters
             if chunk_parameters.chunk_strategy != ChunkStrategy.CHUNK_BY_SIZE.name:
                 space_context = self.get_space_context(space_id)

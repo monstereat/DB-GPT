@@ -1,0 +1,30 @@
+{
+  "question_count": 1,
+  "correct": 0,
+  "incorrect": 1,
+  "missing_result": 0,
+  "invalid_result": 0,
+  "truncated": 0,
+  "result_accuracy": 0.0,
+  "by_category": {
+    "regional_sales": {
+      "question_count": 1,
+      "correct": 0,
+      "incorrect": 1,
+      "missing_result": 0,
+      "invalid_result": 0,
+      "truncated": 0,
+      "accuracy": 0.0
+    }
+  },
+  "macro_average_accuracy": 0.0,
+  "cases": [
+    {
+      "question_id": "q01",
+      "category": "regional_sales",
+      "status": "incorrect",
+      "result_sha256": "5525a908753335ac90bb6e507816522b195a66ea7e14e58022f3096dea8945c8"
+    }
+  ],
+  "note": "Live DB-GPT ReAct structured SQL results compared with fixed synthetic gold answers; not a production authorization certification. Trace showed free SQL omitted completed status and overcounted Shenzhen by 5,000 cents."
+}

@@ -3,7 +3,7 @@ import logging
 import re
 import timeit
 from datetime import datetime
-from typing import Dict, List
+from typing import Any, Dict, List, Optional
 
 from dbgpt._private.config import Config
 from dbgpt.component import ComponentType
@@ -43,6 +43,7 @@ from dbgpt_serve.rag.models.models import KnowledgeSpaceDao, KnowledgeSpaceEntit
 from dbgpt_serve.rag.retriever.knowledge_space import KnowledgeSpaceRetriever
 from dbgpt_serve.rag.service.service import SyncStatus
 from dbgpt_serve.rag.storage_manager import StorageManager
+from dbgpt_serve.utils.token_quota_client import build_metered_llm_client_wrapper
 
 knowledge_space_dao = KnowledgeSpaceDao()
 knowledge_document_dao = KnowledgeDocumentDao()
@@ -247,7 +248,11 @@ class KnowledgeService:
                 res.page = result.page
         return res
 
-    async def document_summary(self, request: DocumentSummaryRequest):
+    async def document_summary(
+        self,
+        request: DocumentSummaryRequest,
+        token_quota_context: Optional[Dict[str, Any]] = None,
+    ):
         """get document summary
         Args:
             - request: DocumentSummaryRequest
@@ -288,12 +293,16 @@ class KnowledgeService:
             datasource=document.content,
             knowledge_type=KnowledgeType.get_by_value(document.doc_type),
         )
+        llm_client = DefaultLLMClient(
+            worker_manager=worker_manager, auto_convert_message=True
+        )
+        wrap_client = build_metered_llm_client_wrapper(token_quota_context)
+        if wrap_client:
+            llm_client = wrap_client(llm_client)
         assembler = SummaryAssembler(
             knowledge=knowledge,
             model_name=request.model_name,
-            llm_client=DefaultLLMClient(
-                worker_manager=worker_manager, auto_convert_message=True
-            ),
+            llm_client=llm_client,
             language=CFG.LANGUAGE,
             chunk_parameters=chunk_parameters,
         )
@@ -303,7 +312,7 @@ class KnowledgeService:
             raise Exception(f"can not found chunks for {request.doc_id}")
 
         return await self._llm_extract_summary(
-            summary, request.conv_uid, request.model_name
+            summary, request.conv_uid, request.model_name, token_quota_context
         )
 
     def get_space_context_by_space_id(self, space_id):
@@ -605,7 +614,11 @@ class KnowledgeService:
         return None
 
     async def _llm_extract_summary(
-        self, doc: str, conn_uid: str, model_name: str = None
+        self,
+        doc: str,
+        conn_uid: str,
+        model_name: str = None,
+        token_quota_context: Optional[Dict[str, Any]] = None,
     ):
         """Extract triplets from text by llm
         Args:
@@ -624,6 +637,8 @@ class KnowledgeService:
             model_name=model_name,
             model_cache_enable=False,
             chat_mode=ChatScene.ExtractRefineSummary,
+            max_new_tokens=256,
+            token_quota_context=token_quota_context,
         )
         executor = CFG.SYSTEM_APP.get_component(
             ComponentType.EXECUTOR_DEFAULT, ExecutorFactory

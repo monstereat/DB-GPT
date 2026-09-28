@@ -1,0 +1,38 @@
+{
+  "base_commit": "93da908aa2ba936909a70d7b083ab6455f8a0a85",
+  "baseline": "/Users/monster/Documents/GitHub/code/DB-GPT/specs/003-order-aware-evaluation/scope-baseline-T001.json",
+  "new_files": [],
+  "modified_preexisting_files": [
+    "docs/develop-me-roadmap.md",
+    "examples/enterprise-text2sql/README.md",
+    "examples/enterprise-text2sql/ecommerce_demo.py",
+    "examples/enterprise-text2sql/evaluate_candidates.py",
+    "examples/enterprise-text2sql/gold_questions.json",
+    "examples/enterprise-text2sql/test_evaluate_candidates.py"
+  ],
+  "touched_files": [
+    "docs/develop-me-roadmap.md",
+    "examples/enterprise-text2sql/README.md",
+    "examples/enterprise-text2sql/ecommerce_demo.py",
+    "examples/enterprise-text2sql/evaluate_candidates.py",
+    "examples/enterprise-text2sql/gold_questions.json",
+    "examples/enterprise-text2sql/test_evaluate_candidates.py"
+  ],
+  "allow_patterns": [
+    "examples/enterprise-text2sql/gold_questions.json",
+    "examples/enterprise-text2sql/evaluate_candidates.py",
+    "examples/enterprise-text2sql/ecommerce_demo.py",
+    "examples/enterprise-text2sql/test_evaluate_candidates.py",
+    "examples/enterprise-text2sql/test_ecommerce_demo.py",
+    "specs/003-order-aware-evaluation/**"
+  ],
+  "internal_patterns": [
+    "specs/003-order-aware-evaluation/**",
+    "specs/003-order-aware-evaluation/scope-baseline-T001.json"
+  ],
+  "outside_scope": [
+    "docs/develop-me-roadmap.md",
+    "examples/enterprise-text2sql/README.md"
+  ],
+  "passed": false
+}

@@ -327,6 +327,43 @@ async def test_execute_analysis_legacy_env_propagates_path_without_code_interpol
 
 
 @pytest.mark.asyncio
+async def test_execute_analysis_emits_redacted_tool_span(monkeypatch):
+    class _Span:
+        metadata = None
+
+    span = _Span()
+    started = {}
+
+    def start_span(name, *, span_type, metadata):
+        started.update(name=name, span_type=span_type, metadata=metadata)
+        return span
+
+    def end_span(_span, *, metadata):
+        span.metadata = metadata
+
+    monkeypatch.setattr(execute_analysis_module.root_tracer, "start_span", start_span)
+    monkeypatch.setattr(execute_analysis_module.root_tracer, "end_span", end_span)
+    tool = execute_analysis_module.make_execute_analysis(
+        {
+            "actor_user_id": "analyst-a",
+            "conv_id": "conversation-a",
+            "file_path": "/private/reports/revenue.csv",
+        }
+    )
+
+    await tool()
+
+    assert started["name"] == "agent.execute_analysis"
+    assert started["metadata"] == {
+        "actor_user_id": "analyst-a",
+        "conversation_trace_id": "conversation-a",
+    }
+    assert span.metadata["status"] == "returned"
+    assert "elapsed_ms" in span.metadata
+    assert "/private/reports/revenue.csv" not in repr(started) + repr(span.metadata)
+
+
+@pytest.mark.asyncio
 async def test_execute_analysis_no_args_uses_all_session_files_through_env(
     tmp_path, monkeypatch
 ):
@@ -703,6 +740,65 @@ async def test_code_interpreter_timeout_surfaces_timeout_message(tmp_path, monke
     assert "Execution timed out (60s limit)" in text
     assert "(no output" not in text
     assert str(tmp_path) not in json.dumps(chunks, ensure_ascii=False)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("returncode", "stdout", "stderr", "expected_status"),
+    [
+        (0, b"private output", b"", "completed"),
+        (None, b"", b"", "timeout"),
+    ],
+)
+async def test_code_interpreter_emits_redacted_tool_span(
+    tmp_path, monkeypatch, returncode, stdout, stderr, expected_status
+):
+    class _Span:
+        metadata = None
+
+    span = _Span()
+    started = {}
+
+    def start_span(name, *, span_type, metadata):
+        started.update(name=name, span_type=span_type, metadata=metadata)
+        return span
+
+    def end_span(_span, *, metadata):
+        span.metadata = metadata
+
+    async def run_python_file(*_args, **_kwargs):
+        return returncode, stdout, stderr
+
+    monkeypatch.setattr(code_interpreter_module.root_tracer, "start_span", start_span)
+    monkeypatch.setattr(code_interpreter_module.root_tracer, "end_span", end_span)
+    monkeypatch.setattr(code_interpreter_module, "_run_python_file", run_python_file)
+    monkeypatch.setattr(
+        "dbgpt.configs.model_config.PILOT_PATH",
+        str(tmp_path / "pilot-root"),
+    )
+    monkeypatch.setattr(
+        "dbgpt.configs.model_config.STATIC_MESSAGE_IMG_PATH",
+        str(tmp_path / "static-images"),
+    )
+    tool = code_interpreter_module.make_code_interpreter(
+        {
+            "conv_id": "conversation-secret",
+            "file_path": "/private/customer-data.csv",
+        }
+    )
+
+    result = await tool(code="print('private code')")
+
+    assert started["name"] == "agent.code_interpreter"
+    assert started["metadata"] == {}
+    assert span.metadata["status"] == expected_status
+    assert "elapsed_ms" in span.metadata
+    serialized_metadata = repr(started) + repr(span.metadata)
+    assert "private code" not in serialized_metadata
+    assert "private output" not in serialized_metadata
+    assert "/private/customer-data.csv" not in serialized_metadata
+    assert "conversation-secret" not in serialized_metadata
+    assert isinstance(result, str)
 
 
 # ---------------------------------------------------------------------------

@@ -6,11 +6,13 @@ import os
 import time
 import uuid
 from concurrent.futures import Executor
-from typing import List, Optional, cast
+from dataclasses import fields
+from typing import Dict, List, Optional, cast
 
 import pandas as pd
-from fastapi import APIRouter, Body, Depends, File, Query, UploadFile
+from fastapi import APIRouter, Body, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
+from starlette.concurrency import run_in_threadpool
 
 from dbgpt._private.config import Config
 from dbgpt.component import ComponentType
@@ -48,10 +50,18 @@ from dbgpt_app.openapi.api_view_model import (
 from dbgpt_app.scene import BaseChat, ChatFactory, ChatParam, ChatScene
 from dbgpt_serve.agent.db.gpts_app import UserRecentAppsDao, adapt_native_app_model
 from dbgpt_serve.core import blocking_func_to_async
+from dbgpt_serve.datasource.api.schemas import (
+    DatasourceApprovalRequest,
+    DatasourceOwnerTransferRequest,
+)
 from dbgpt_serve.datasource.manages.db_conn_info import DBConfig, DbTypeInfo
-from dbgpt_serve.datasource.service.db_summary_client import DBSummaryClient
 from dbgpt_serve.flow.service.service import Service as FlowService
-from dbgpt_serve.utils.auth import UserRequest, get_user_from_headers
+from dbgpt_serve.utils.auth import (
+    UserRequest,
+    get_user_from_headers,
+    local_demo_execution_context,
+    trusted_agent_execution_context,
+)
 
 router = APIRouter()
 CFG = Config()
@@ -89,6 +99,87 @@ def get_db_list(user_id: str = None):
         params.update({"type": item["db_type"]})
         db_params.append(params)
     return db_params
+
+
+def _redact_database_secrets(item: dict, manager) -> dict:
+    """Return database-list metadata without privacy-tagged credentials."""
+    result = dict(item)
+    result["db_pwd"] = ""
+    param_cls = manager._get_param_cls(result["db_type"])
+    private_names = {
+        field.name
+        for field in fields(param_cls)
+        if "privacy" in str(field.metadata.get("tags", "")).split(",")
+    }
+    ext_config = result.get("ext_config")
+    if isinstance(ext_config, str) and ext_config:
+        try:
+            ext_config = json.loads(ext_config)
+        except json.JSONDecodeError:
+            result["ext_config"] = ""
+            return result
+    if isinstance(ext_config, dict):
+        for name in private_names:
+            if name in ext_config:
+                ext_config[name] = ""
+        result["ext_config"] = (
+            json.dumps(ext_config, ensure_ascii=False)
+            if isinstance(item.get("ext_config"), str)
+            else ext_config
+        )
+    return result
+
+
+def _require_datasource_owner_or_admin(db_name: str, user_info: UserRequest):
+    manager = CFG.local_db_manager
+    if not user_info.user_id:
+        raise HTTPException(status_code=403, detail="Datasource access denied")
+    is_admin = user_info.role == "admin"
+    matches = manager.get_db_list(
+        db_name=db_name,
+        user_id=None if is_admin else user_info.user_id,
+    )
+    datasource = next(
+        (item for item in matches if item.get("db_name") == db_name), None
+    )
+    if datasource is None:
+        raise HTTPException(status_code=404, detail="Datasource not found")
+    if not is_admin and datasource.get("user_id") != user_info.user_id:
+        raise HTTPException(status_code=403, detail="Datasource access denied")
+
+
+def _verified_datasource_admin(user_info: UserRequest) -> str:
+    if not user_info or user_info.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin role required")
+    identity = trusted_agent_execution_context(user_info)
+    if (
+        not identity
+        or identity.get("source") != "verified_oidc_jwt"
+        or not identity.get("actor_id")
+        or identity.get("actor_id") != user_info.user_id
+    ):
+        raise HTTPException(
+            status_code=403, detail="Verified OIDC admin identity required"
+        )
+    return identity["actor_id"]
+
+
+def _chat_completion_daily_quota_context(
+    user_token: UserRequest, chat_mode: str, domain_type: Optional[str]
+) -> Optional[Dict[str, object]]:
+    configured_limit = os.getenv("DBGPT_DAILY_TOKEN_LIMIT")
+    if not configured_limit or not configured_limit.strip():
+        return None
+    if chat_mode in {ChatScene.ChatFlow.value()} or domain_type:
+        raise HTTPException(
+            status_code=503,
+            detail="Daily token quota is not available for this chat mode",
+        )
+    from .token_quota import resolve_daily_token_quota_context
+
+    return resolve_daily_token_quota_context(
+        user_token, configured_limit, "DBGPT_DAILY_TOKEN_LIMIT"
+    )
 
 
 def plugins_select_info():
@@ -176,13 +267,12 @@ async def db_connect_list(
     db_name: Optional[str] = Query(default=None, description="database name"),
     user_info: UserRequest = Depends(get_user_from_headers),
 ):
-    results = CFG.local_db_manager.get_db_list(
-        db_name=db_name, user_id=user_info.user_id
-    )
+    manager = CFG.local_db_manager
+    results = manager.get_db_list(db_name=db_name, user_id=user_info.user_id)
     # 排除部分数据库不允许用户访问
     if results and len(results):
         results = [
-            d
+            _redact_database_secrets(d, manager)
             for d in results
             if d.get("db_name") not in ["auth", "dbgpt", "test", "public"]
         ]
@@ -195,6 +285,98 @@ async def db_connect_add(
     user_token: UserRequest = Depends(get_user_from_headers),
 ):
     return Result.succ(CFG.local_db_manager.add_db(db_config, user_token.user_id))
+
+
+@router.get("/v1/chat/db/approvals/pending", response_model=Result[List])
+async def datasource_pending_approvals(
+    user_token: UserRequest = Depends(get_user_from_headers),
+):
+    _verified_datasource_admin(user_token)
+    pending = await blocking_func_to_async(
+        CFG.SYSTEM_APP, CFG.local_db_manager.storage.list_pending
+    )
+    return Result.succ(pending)
+
+
+@router.get("/v1/chat/db/{db_name}/approvals", response_model=Result[List])
+async def datasource_approval_audit(
+    db_name: str,
+    user_token: UserRequest = Depends(get_user_from_headers),
+):
+    _verified_datasource_admin(user_token)
+    audit = await blocking_func_to_async(
+        CFG.SYSTEM_APP,
+        CFG.local_db_manager.storage.list_approval_audit,
+        db_name,
+    )
+    return Result.succ(audit)
+
+
+@router.post("/v1/chat/db/{db_name}/approval", response_model=Result)
+async def datasource_review(
+    db_name: str,
+    request: DatasourceApprovalRequest = Body(...),
+    user_token: UserRequest = Depends(get_user_from_headers),
+):
+    try:
+        actor_id = _verified_datasource_admin(user_token)
+    except HTTPException:
+        local_identity = local_demo_execution_context(user_token, db_name)
+        if not local_identity:
+            raise
+        actor_id = local_identity["actor_id"]
+    decision = request.decision
+    reason = request.reason or ""
+    manager = CFG.local_db_manager
+    reviewed = await blocking_func_to_async(
+        CFG.SYSTEM_APP,
+        manager.storage.review,
+        db_name,
+        actor_id,
+        decision,
+        reason,
+        bool(local_identity),
+    )
+    manager.invalidate_connector(db_name)
+    if decision == "approve":
+        await manager.async_db_summary_embedding(db_name, reviewed["db_type"])
+    return Result.succ(
+        {
+            "db_name": db_name,
+            "approval_status": reviewed["approval_status"],
+            "approved_by": reviewed.get("approved_by"),
+            "approved_at": reviewed.get("approved_at"),
+        }
+    )
+
+
+@router.post("/v1/chat/db/{db_name}/owner-transfer", response_model=Result)
+async def datasource_owner_transfer(
+    db_name: str,
+    request: DatasourceOwnerTransferRequest = Body(...),
+    user_token: UserRequest = Depends(get_user_from_headers),
+):
+    actor_id = _verified_datasource_admin(user_token)
+    owner_id = request.owner_id.strip()
+    if not owner_id:
+        raise HTTPException(status_code=422, detail="Datasource owner is required")
+    manager = CFG.local_db_manager
+    transferred = await blocking_func_to_async(
+        CFG.SYSTEM_APP,
+        manager.storage.transfer_owner,
+        db_name,
+        actor_id,
+        owner_id,
+        request.reason or "",
+    )
+    manager.invalidate_connector(db_name)
+    return Result.succ(
+        {
+            "db_name": db_name,
+            "owner_id": transferred.get("submitted_by"),
+            "approval_status": transferred.get("approval_status"),
+        }
+    )
 
 
 @router.get("/v1/permission/db/list", response_model=Result[List])
@@ -210,17 +392,29 @@ async def db_connect_edit(
     db_config: DBConfig = Body(),
     user_token: UserRequest = Depends(get_user_from_headers),
 ):
-    return Result.succ(CFG.local_db_manager.edit_db(db_config))
+    _require_datasource_owner_or_admin(db_config.db_name, user_token)
+    return Result.succ(
+        CFG.local_db_manager.edit_db(db_config, updated_by=user_token.user_id)
+    )
 
 
 @router.post("/v1/chat/db/delete", response_model=Result[bool])
-async def db_connect_delete(db_name: str = None):
+async def db_connect_delete(
+    db_name: str = None,
+    user_info: UserRequest = Depends(get_user_from_headers),
+):
+    _require_datasource_owner_or_admin(db_name, user_info)
     CFG.local_db_manager.db_summary_client.delete_db_profile(db_name)
     return Result.succ(CFG.local_db_manager.delete_db(db_name))
 
 
 @router.post("/v1/chat/db/refresh", response_model=Result[bool])
-async def db_connect_refresh(db_config: DBConfig = Body()):
+async def db_connect_refresh(
+    db_config: DBConfig = Body(),
+    user_info: UserRequest = Depends(get_user_from_headers),
+):
+    _require_datasource_owner_or_admin(db_config.db_name, user_info)
+    CFG.local_db_manager.storage.require_approved(db_config.db_name)
     CFG.local_db_manager.db_summary_client.delete_db_profile(db_config.db_name)
     success = await CFG.local_db_manager.async_db_summary_embedding(
         db_config.db_name, db_config.db_type
@@ -228,28 +422,32 @@ async def db_connect_refresh(db_config: DBConfig = Body()):
     return Result.succ(success)
 
 
-async def async_db_summary_embedding(db_name, db_type):
-    db_summary_client = DBSummaryClient(system_app=CFG.SYSTEM_APP)
-    db_summary_client.db_summary_embedding(db_name, db_type)
-
-
 @router.post("/v1/chat/db/test/connect", response_model=Result[bool])
 async def test_connect(
     db_config: DBConfig = Body(),
     user_token: UserRequest = Depends(get_user_from_headers),
 ):
+    registered = CFG.local_db_manager.get_db_list(
+        db_name=db_config.db_name, user_id=None
+    )
+    if any(item.get("db_name") == db_config.db_name for item in registered):
+        _require_datasource_owner_or_admin(db_config.db_name, user_token)
     try:
-        # TODO Change the synchronous call to the asynchronous call
-        CFG.local_db_manager.test_connect(db_config)
+        await run_in_threadpool(CFG.local_db_manager.test_connect, db_config)
         return Result.succ(True)
-    except Exception as e:
-        return Result.failed(code="E1001", msg=str(e))
+    except Exception:
+        return Result.failed(code="E1001", msg="Database connection test failed")
 
 
 @router.post("/v1/chat/db/summary", response_model=Result[bool])
-async def db_summary(db_name: str, db_type: str):
-    # TODO Change the synchronous call to the asynchronous call
-    async_db_summary_embedding(db_name, db_type)
+async def db_summary(
+    db_name: str,
+    db_type: str,
+    user_info: UserRequest = Depends(get_user_from_headers),
+):
+    _require_datasource_owner_or_admin(db_name, user_info)
+    CFG.local_db_manager.storage.require_approved(db_name)
+    await CFG.local_db_manager.async_db_summary_embedding(db_name, db_type)
     return Result.succ(True)
 
 
@@ -293,7 +491,7 @@ async def resource_params_list(
     user_token: UserRequest = Depends(get_user_from_headers),
 ):
     if resource_type == "database":
-        result = get_db_list()
+        result = get_db_list(user_token.user_id) if user_token.user_id else []
     elif resource_type == "knowledge":
         result = knowledge_list()
     elif resource_type == "tool":
@@ -309,11 +507,11 @@ async def params_list(
     user_token: UserRequest = Depends(get_user_from_headers),
 ):
     if ChatScene.ChatWithDbQA.value() == chat_mode:
-        result = get_db_list()
+        result = get_db_list(user_token.user_id) if user_token.user_id else []
     elif ChatScene.ChatWithDbExecute.value() == chat_mode:
-        result = get_db_list()
+        result = get_db_list(user_token.user_id) if user_token.user_id else []
     elif ChatScene.ChatDashboard.value() == chat_mode:
-        result = get_db_list()
+        result = get_db_list(user_token.user_id) if user_token.user_id else []
     elif ChatScene.ChatExecution.value() == chat_mode:
         result = plugins_select_info()
     elif ChatScene.ChatKnowledge.value() == chat_mode:
@@ -393,7 +591,7 @@ async def file_upload(
             if max_new_tokens is not None:
                 dialogue.max_new_tokens = max_new_tokens
 
-            chat: BaseChat = await get_chat_instance(dialogue)
+            chat: BaseChat = await get_chat_instance(dialogue, user_token)
             await chat.prepare()
             # Refresh messages
 
@@ -466,7 +664,11 @@ def get_hist_messages(conv_uid: str, user_name: str = None):
     return instance.get_history_messages({"conv_uid": conv_uid, "user_name": user_name})
 
 
-async def get_chat_instance(dialogue: ConversationVo = Body()) -> BaseChat:
+async def get_chat_instance(
+    dialogue: ConversationVo = Body(),
+    user_token: Optional[UserRequest] = None,
+    token_quota_context: Optional[Dict[str, object]] = None,
+) -> BaseChat:
     logger.info(f"get_chat_instance:{dialogue}")
     if not dialogue.chat_mode:
         dialogue.chat_mode = ChatScene.ChatNormal.value()
@@ -494,6 +696,13 @@ async def get_chat_instance(dialogue: ConversationVo = Body()) -> BaseChat:
         max_new_tokens=dialogue.max_new_tokens,
         prompt_code=dialogue.prompt_code,
         chat_mode=ChatScene.of_mode(dialogue.chat_mode),
+        user_role=user_token.role if user_token else None,
+        tenant_id=user_token.tenant_id if user_token else None,
+        region_id=user_token.region_id if user_token else None,
+        verified_execution_context=(
+            trusted_agent_execution_context(user_token) if user_token else None
+        ),
+        token_quota_context=token_quota_context,
     )
     chat: BaseChat = await blocking_func_to_async(
         CFG.SYSTEM_APP,
@@ -515,7 +724,7 @@ async def chat_prepare(
     dialogue.user_name = user_token.user_id if user_token else dialogue.user_name
     logger.info(f"chat_prepare:{dialogue}")
     ## check conv_uid
-    chat: BaseChat = await get_chat_instance(dialogue)
+    chat: BaseChat = await get_chat_instance(dialogue, user_token)
 
     await chat.prepare()
 
@@ -551,23 +760,43 @@ async def chat_completions(
     }
     try:
         domain_type = _parse_domain_type(dialogue)
+        token_quota_context = _chat_completion_daily_quota_context(
+            user_token, dialogue.chat_mode, domain_type
+        )
+        from .token_quota import build_metered_llm_client_wrapper
+
+        llm_client_wrapper = build_metered_llm_client_wrapper(token_quota_context)
         if dialogue.chat_mode == ChatScene.ChatAgent.value():
             from dbgpt_serve.agent.agents.controller import multi_agents
+
+            if token_quota_context and multi_agents.is_flow_chat(dialogue.app_code):
+                raise HTTPException(
+                    status_code=503,
+                    detail="Daily token quota is not available for this flow type",
+                )
 
             dialogue.ext_info.update({"model_name": dialogue.model_name})
             dialogue.ext_info.update({"incremental": dialogue.incremental})
             dialogue.ext_info.update({"temperature": dialogue.temperature})
+            agent_ext_info = {
+                key: value
+                for key, value in dialogue.ext_info.items()
+                if key != "trusted_execution_context"
+            }
+            agent_stream = multi_agents.app_agent_chat(
+                conv_uid=dialogue.conv_uid,
+                chat_mode=dialogue.chat_mode,
+                gpts_name=dialogue.app_code,
+                user_query=dialogue.user_input,
+                user_code=dialogue.user_name,
+                sys_code=dialogue.sys_code,
+                app_code=dialogue.app_code,
+                trusted_execution_context=trusted_agent_execution_context(user_token),
+                llm_client_wrapper=llm_client_wrapper,
+                **agent_ext_info,
+            )
             return StreamingResponse(
-                multi_agents.app_agent_chat(
-                    conv_uid=dialogue.conv_uid,
-                    chat_mode=dialogue.chat_mode,
-                    gpts_name=dialogue.app_code,
-                    user_query=dialogue.user_input,
-                    user_code=dialogue.user_name,
-                    sys_code=dialogue.sys_code,
-                    app_code=dialogue.app_code,
-                    **dialogue.ext_info,
-                ),
+                agent_stream,
                 headers=headers,
                 media_type="text/event-stream",
             )
@@ -601,7 +830,9 @@ async def chat_completions(
             with root_tracer.start_span(
                 "get_chat_instance", span_type=SpanType.CHAT, metadata=dialogue.dict()
             ):
-                chat: BaseChat = await get_chat_instance(dialogue)
+                chat: BaseChat = await get_chat_instance(
+                    dialogue, user_token, token_quota_context
+                )
 
             if not chat.prompt_template.stream_out:
                 return StreamingResponse(
@@ -621,13 +852,18 @@ async def chat_completions(
                     media_type="text/plain",
                 )
     except Exception as e:
+        if isinstance(e, HTTPException) and e.status_code in {401, 403, 500, 503}:
+            raise
         logger.exception(f"Chat Exception!{dialogue}", e)
+        from .token_quota import safe_token_quota_error
+
+        public_error = safe_token_quota_error(e) or str(e)
 
         async def error_text(err_msg):
             yield f"data:{err_msg}\n\n"
 
         return StreamingResponse(
-            error_text(str(e)),
+            error_text(public_error),
             headers=headers,
             media_type="text/plain",
         )
@@ -729,9 +965,15 @@ async def flow_stream_generator(func, incremental: bool, model_name: str):
 
 async def no_stream_generator(chat, model_name: str, conv_uid: Optional[str] = None):
     with root_tracer.start_span("no_stream_generator"):
-        msg = await chat.nostream_call()
-        stream_id = conv_uid or f"chatcmpl-{str(uuid.uuid1())}"
-        yield _v1_create_completion_response(msg, None, model_name, stream_id)
+        try:
+            msg = await chat.nostream_call()
+            stream_id = conv_uid or f"chatcmpl-{str(uuid.uuid1())}"
+            yield _v1_create_completion_response(msg, None, model_name, stream_id)
+        except Exception as e:
+            logger.exception("no_stream_generator error")
+            from .token_quota import safe_token_quota_error
+
+            yield f"data: [SERVER_ERROR]{safe_token_quota_error(e) or str(e)}\n\n"
 
 
 async def stream_generator(
@@ -815,7 +1057,9 @@ async def stream_generator(
         span.end()
     except Exception as e:
         logger.exception("stream_generator error")
-        yield f"data: [SERVER_ERROR]{str(e)}\n\n"
+        from .token_quota import safe_token_quota_error
+
+        yield f"data: [SERVER_ERROR]{safe_token_quota_error(e) or str(e)}\n\n"
         if incremental:
             yield "data: [DONE]\n\n"
 

@@ -12,6 +12,9 @@ from dbgpt.core.awel.flow import (
     Parameter,
     ViewMetadata,
 )
+from dbgpt.core.interface.operators.llm_operator import (
+    wrap_llm_client_for_current_context,
+)
 from dbgpt.core.operators import BaseLLM, BaseLLMOperator, BaseStreamingLLMOperator
 from dbgpt.util.i18n_utils import _
 
@@ -55,7 +58,7 @@ class MixinLLMOperator(BaseLLM, BaseOperator, ABC):
 
                 logger.info("Can't find worker manager factory, use OpenAILLMClient.")
                 self._llm_client = OpenAILLMClient()
-        return self._llm_client
+        return wrap_llm_client_for_current_context(self._llm_client)
 
 
 class LLMOperator(MixinLLMOperator, BaseLLMOperator):

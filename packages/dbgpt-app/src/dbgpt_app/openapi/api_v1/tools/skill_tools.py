@@ -5,6 +5,8 @@ from typing import Any, Dict
 
 from dbgpt.agent.resource.tool.base import tool
 
+from .tool_tracing import trace_agent_tool
+
 
 def make_load_skill(react_state: Dict[str, Any]):
     """Return a ``load_skill`` FunctionTool bound to the given react_state."""
@@ -14,6 +16,7 @@ def make_load_skill(react_state: Dict[str, Any]):
         "Returns the SKILL.md content of the specified skill. "
         '参数: {"skill_name": "技能名称", "file_path": "技能文件路径"}'
     )
+    @trace_agent_tool("agent.load_skill")
     def load_skill(skill_name: str, file_path: str) -> str:
         """Load the skill content (SKILL.md) by skill name and file path."""
         from dbgpt.agent.claude_skill import get_registry
@@ -71,6 +74,7 @@ def make_execute_skill_script_file(react_state: Dict[str, Any]):
         description="执行技能scripts目录下的脚本文件。参数: "
         '{"skill_name": "技能名称", "script_file_name": "脚本文件名", "args": {参数}}'
     )
+    @trace_agent_tool("agent.execute_skill_script_file")
     async def execute_skill_script_file(
         skill_name: str, script_file_name: str, args: dict | None = None
     ) -> str:

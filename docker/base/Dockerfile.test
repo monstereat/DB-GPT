@@ -1,0 +1,69 @@
+ARG BASE_IMAGE="ubuntu:22.04"
+ARG USE_TSINGHUA_UBUNTU="false"
+FROM ${BASE_IMAGE}
+
+ARG PYTHON_VERSION=3.11
+ARG PIP_INDEX_URL="https://pypi.tuna.tsinghua.edu.cn/simple"
+ARG UV_TRUSTED_HOST="127.0.0.1"
+ARG UV_HTTP_TIMEOUT=180
+ARG EXTRAS="base,proxy_ollama,storage_chromadb,datasource_postgres"
+ARG USE_TSINGHUA_UBUNTU
+ARG CMAKE_ARGS
+ARG INSTALL_RUST="true"
+
+ENV PYTHONUNBUFFERED=1 \
+    DEBIAN_FRONTEND=noninteractive \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8 \
+    PIP_INDEX_URL=${PIP_INDEX_URL} \
+    PIP_TRUSTED_HOST=${UV_TRUSTED_HOST} \
+    UV_TRUSTED_HOST=${UV_TRUSTED_HOST} \
+    UV_INSECURE_HOST=${UV_TRUSTED_HOST} \
+    UV_HTTP_TIMEOUT=${UV_HTTP_TIMEOUT} \
+    CMAKE_ARGS=${CMAKE_ARGS} \
+    INSTALL_RUST=${INSTALL_RUST}
+
+RUN if [ "$USE_TSINGHUA_UBUNTU" = "true" ]; then \
+        sed -i 's/archive.ubuntu.com/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.list && \
+        sed -i 's/security.ubuntu.com/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.list; \
+    fi && \
+    apt-get update && apt-get install -y --no-install-recommends \
+        gnupg ca-certificates apt-transport-https git curl wget tzdata sqlite3 \
+        libpq-dev default-libmysqlclient-dev build-essential pkg-config \
+        python${PYTHON_VERSION} python${PYTHON_VERSION}-dev \
+        python${PYTHON_VERSION}-venv python3-pip && \
+    apt-get clean && rm -rf /var/lib/apt/lists/* && \
+    python${PYTHON_VERSION} -m pip install --upgrade pip pipx \
+        --trusted-host ${UV_TRUSTED_HOST} && \
+    pipx ensurepath --global && \
+    pipx install uv --global --pip-args="--trusted-host ${UV_TRUSTED_HOST}"
+
+RUN if [ "$INSTALL_RUST" = "true" ]; then \
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y; \
+    fi
+
+ENV PATH="/root/.cargo/bin:${PATH}"
+WORKDIR /app
+ENV VIRTUAL_ENV=/app/.venv
+RUN python${PYTHON_VERSION} -m venv $VIRTUAL_ENV
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+COPY pyproject.toml README.md uv.lock ./
+COPY packages /app/packages
+
+RUN extras=$(echo $EXTRAS | tr ',' '\n' | while read extra; do echo "--extra $extra"; done | tr '\n' ' ') && \
+    uv sync --frozen --all-packages --no-dev $extras \
+        --index-url=$PIP_INDEX_URL --trusted-host=$UV_TRUSTED_HOST \
+        --link-mode=hardlink && \
+    rm -rf /root/.cache/uv && \
+    python -c "import dbgpt; print(dbgpt.__version__)"
+
+COPY configs /app/configs
+COPY assets /app/assets
+RUN mkdir -p /app/examples/enterprise-text2sql
+COPY examples/enterprise-text2sql/ecommerce_demo.py \
+    examples/enterprise-text2sql/guarded_query.py \
+    examples/enterprise-text2sql/gold_questions.json \
+    examples/enterprise-text2sql/schema_metadata.json \
+    examples/enterprise-text2sql/business_dictionary.md \
+    /app/examples/enterprise-text2sql/
+CMD ["dbgpt", "start", "webserver"]

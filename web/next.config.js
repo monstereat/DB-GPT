@@ -2,6 +2,7 @@
 const CopyPlugin = require("copy-webpack-plugin");
 const MonacoWebpackPlugin = require("monaco-editor-webpack-plugin");
 const path = require("path");
+const apiProxyTarget = (process.env.API_PROXY_TARGET || "http://127.0.0.1:5670").replace(/\/+$/, "");
 const nextConfig = {
   experimental: {
     esmExternals: "loose",
@@ -13,12 +14,16 @@ const nextConfig = {
     return [
       {
         source: '/api/v1/:path*',
-        destination: 'http://127.0.0.1:5670/api/v1/:path*',
+        destination: `${apiProxyTarget}/api/v1/:path*`,
+      },
+      {
+        source: '/api/v2/:path*',
+        destination: `${apiProxyTarget}/api/v2/:path*`,
       },
     ];
   },
   env: {
-    API_BASE_URL: "http://127.0.0.1:5670",
+    API_BASE_URL: process.env.API_BASE_URL ?? "",
     GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID,
     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
     GET_USER_URL: process.env.GET_USER_URL,

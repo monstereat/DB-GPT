@@ -1,7 +1,7 @@
 import sqlite3
+import time
 
 import pytest
-
 from guarded_query import GuardedSQLiteQuery, QueryRejected
 
 
@@ -40,6 +40,32 @@ def test_aggregated_read_only_sql(executor):
     assert result["rows"] == [[380]]
     assert result["returned_rows"] == 1
     assert result["duration_ms"] >= 0
+
+
+def test_execution_budget_interrupts_expensive_allowed_select(tmp_path):
+    db_path = tmp_path / "budget.sqlite"
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("CREATE TABLE orders (id INTEGER)")
+        conn.executemany("INSERT INTO orders VALUES (?)", ((i,) for i in range(10000)))
+
+    events = []
+    executor = GuardedSQLiteQuery(
+        db_path,
+        {"orders"},
+        allowed_columns={"orders": {"id"}},
+        timeout_ms=100,
+        audit_sink=events.append,
+    )
+    started = time.monotonic()
+    with pytest.raises(QueryRejected):
+        executor.run(
+            "SELECT COUNT(*) FROM orders AS first, orders AS second, orders AS third"
+        )
+    elapsed = time.monotonic() - started
+
+    assert elapsed < 3
+    assert events[0]["status"] == "rejected"
+    assert events[0]["duration_ms"] >= 80
 
 
 def test_cte_and_limit_are_supported(executor):
@@ -156,6 +182,12 @@ def test_tenant_scope_filters_rows_and_blocks_direct_main_table_access(tmp_path)
 
     with pytest.raises(QueryRejected):
         tenant_a.run("SELECT region FROM main.orders")
+
+    with pytest.raises(QueryRejected, match="CTE names cannot shadow"):
+        tenant_a.run(
+            "WITH orders AS (SELECT * FROM main.orders) "
+            "SELECT * FROM orders"
+        )
 
 
 def test_tenant_scope_does_not_expose_tenant_or_sensitive_columns(tmp_path):

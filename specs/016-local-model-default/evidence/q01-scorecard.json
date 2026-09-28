@@ -1,0 +1,30 @@
+{
+  "question_count": 1,
+  "correct": 0,
+  "incorrect": 0,
+  "missing_result": 1,
+  "invalid_result": 0,
+  "truncated": 0,
+  "result_accuracy": 0.0,
+  "by_category": {
+    "regional_sales": {
+      "question_count": 1,
+      "correct": 0,
+      "incorrect": 0,
+      "missing_result": 1,
+      "invalid_result": 0,
+      "truncated": 0,
+      "accuracy": 0.0
+    }
+  },
+  "macro_average_accuracy": 0.0,
+  "cases": [
+    {
+      "question_id": "q01",
+      "category": "regional_sales",
+      "status": "missing_result",
+      "result_sha256": null
+    }
+  ],
+  "note": "Live DB-GPT ReAct structured SQL results compared with fixed synthetic gold answers; not a production authorization certification."
+}

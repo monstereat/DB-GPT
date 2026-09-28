@@ -76,7 +76,6 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     --no-dev $extras \
     --index-url=$PIP_INDEX_URL \
     --trusted-host=$UV_TRUSTED_HOST \
-    && \
     # Verify installation
     python -c "import dbgpt; print(dbgpt.__version__)"
 ARG LANGUAGE="en"

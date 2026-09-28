@@ -5,6 +5,7 @@ import AdvancedChart, { createChartConfig } from '@/new-components/charts';
 import MarkDownContext from '@/new-components/common/MarkdownContext';
 import type { SubAgentState, SubAgentStep } from '@/types/subagent';
 import type { AgentCitation } from '@/utils/react-agent-final';
+import { buildSqlResultView, filterSqlResultRows } from '@/utils/react-sql-result';
 import {
   ApartmentOutlined,
   AppstoreOutlined,
@@ -974,6 +975,12 @@ const OutputRenderer: React.FC<{ output: ExecutionOutput; index: number; action?
   ({ output, index: _index, action }) => {
     const { t } = useTranslation();
     const content = output.content;
+    const sqlResult = output.output_type === 'sql_result' ? buildSqlResultView(content) : null;
+    const [selectedChartCategory, setSelectedChartCategory] = useState<string | null>(null);
+
+    useEffect(() => {
+      setSelectedChartCategory(null);
+    }, [output.content, output.output_type]);
 
     if (output.output_type === 'thought') {
       return null; // Don't render thoughts
@@ -1028,6 +1035,51 @@ const OutputRenderer: React.FC<{ output: ExecutionOutput; index: number; action?
             scroll={{ x: 'max-content' }}
             className='border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden'
           />
+        )}
+
+        {output.output_type === 'sql_result' && sqlResult && (
+          <div className='space-y-4'>
+            {sqlResult.chart && selectedChartCategory !== null && (
+              <div className='flex items-center gap-2 text-xs text-gray-500' role='status'>
+                <span>
+                  图表筛选：{sqlResult.chart.xField} = {selectedChartCategory}
+                </span>
+                <Button type='link' size='small' className='!p-0 h-auto' onClick={() => setSelectedChartCategory(null)}>
+                  清除筛选
+                </Button>
+              </div>
+            )}
+            <Table
+              size='small'
+              pagination={{ pageSize: 10, showSizeChanger: true }}
+              columns={sqlResult.columns}
+              dataSource={filterSqlResultRows(sqlResult, selectedChartCategory)}
+              rowKey='key'
+              scroll={{ x: 'max-content' }}
+              className='border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden'
+            />
+            <div className='text-xs text-gray-500'>
+              显示 {sqlResult.rows.length} / {sqlResult.rowCount} 行{sqlResult.truncated ? '，结果已截断' : ''}
+            </div>
+            {sqlResult.chart && (
+              <div className='h-72'>
+                <AdvancedChart
+                  config={createChartConfig(sqlResult.chart.data, {
+                    chartType: sqlResult.chart.chartType,
+                    xField: sqlResult.chart.xField,
+                    yField: sqlResult.chart.yField,
+                    title: `${sqlResult.chart.yField} 按 ${sqlResult.chart.xField} 分布`,
+                    height: 280,
+                    onDataPointClick: data => {
+                      const category = data?.[sqlResult.chart?.xField || ''];
+                      if (typeof category !== 'string') return;
+                      setSelectedChartCategory(current => (current === category ? null : category));
+                    },
+                  })}
+                />
+              </div>
+            )}
+          </div>
         )}
 
         {output.output_type === 'chart' && (

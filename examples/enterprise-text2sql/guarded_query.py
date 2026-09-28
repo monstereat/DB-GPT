@@ -5,6 +5,7 @@ Call GuardedSQLiteQuery.run AFTER the model generates SQL and BEFORE showing
 results. All authorization inputs must come from server-side business policy,
 never from the LLM or request body.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -15,6 +16,10 @@ from pathlib import Path
 from typing import Any, Callable, Mapping
 from urllib.parse import quote
 
+import sqlglot
+from sqlglot import exp
+from sqlglot.errors import SqlglotError
+
 
 class QueryRejected(ValueError):
     """Unsafe query, forbidden table/column, or violated execution budget."""
@@ -22,9 +27,23 @@ class QueryRejected(ValueError):
 
 _ALLOWED_FUNCTIONS = frozenset(
     {
-        "abs", "avg", "coalesce", "count", "date", "datetime", "ifnull",
-        "length", "lower", "max", "min", "round", "strftime", "substr",
-        "sum", "total", "upper",
+        "abs",
+        "avg",
+        "coalesce",
+        "count",
+        "date",
+        "datetime",
+        "ifnull",
+        "length",
+        "lower",
+        "max",
+        "min",
+        "round",
+        "strftime",
+        "substr",
+        "sum",
+        "total",
+        "upper",
     }
 )
 
@@ -40,11 +59,17 @@ class GuardedSQLiteQuery:
         allowed_columns: Mapping[str, set[str] | frozenset[str]] | None = None,
         tenant_id: str | None = None,
         tenant_columns: Mapping[str, str] | None = None,
+        region_id: str | None = None,
+        region_columns: Mapping[str, str] | None = None,
+        order_scope_columns: Mapping[str, str] | None = None,
+        product_scope_columns: Mapping[str, str] | None = None,
         max_rows: int = 100,
         timeout_ms: int = 2000,
         audit_sink: AuditSink | None = None,
     ):
-        if not allowed_tables or not all(isinstance(table, str) and table for table in allowed_tables):
+        if not allowed_tables or not all(
+            isinstance(table, str) and table for table in allowed_tables
+        ):
             raise ValueError("A nonempty server-owned table allowlist is required")
         if not (1 <= max_rows <= 1000):
             raise ValueError("max_rows must be between 1 and 1000")
@@ -58,27 +83,77 @@ class GuardedSQLiteQuery:
         }
         unknown_tables = set(self.allowed_columns) - self.allowed_tables
         if unknown_tables:
-            raise ValueError("Column policy references tables outside the table allowlist")
+            raise ValueError(
+                "Column policy references tables outside the table allowlist"
+            )
         if any(not columns for columns in self.allowed_columns.values()):
             raise ValueError("Column allowlists must be nonempty")
         self.tenant_id = tenant_id
         self.tenant_columns = dict(tenant_columns or {})
+        self.region_id = region_id
+        self.region_columns = dict(region_columns or {})
+        self.order_scope_columns = dict(order_scope_columns or {})
+        self.product_scope_columns = dict(product_scope_columns or {})
         if tenant_id is None and self.tenant_columns:
             raise ValueError("Tenant columns require a server-owned tenant ID")
+        if region_id is not None:
+            if tenant_id is None:
+                raise ValueError("Region scope requires a server-owned tenant ID")
+            if not isinstance(region_id, str) or not region_id:
+                raise ValueError("A nonempty server-owned region ID is required")
+            scope_tables = (
+                set(self.region_columns)
+                | set(self.order_scope_columns)
+                | set(self.product_scope_columns)
+            )
+            if scope_tables != self.allowed_tables:
+                raise ValueError("Every allowed table needs an explicit region policy")
+            if (
+                set(self.region_columns) & set(self.order_scope_columns)
+                or set(self.region_columns) & set(self.product_scope_columns)
+                or set(self.order_scope_columns) & set(self.product_scope_columns)
+            ):
+                raise ValueError("A table can have only one region-scope policy")
+            if (
+                "orders" not in self.allowed_tables
+                or "order_items" not in self.allowed_tables
+            ):
+                raise ValueError("Region scope requires orders and order_items tables")
+            if "order_id" not in self.allowed_columns.get("orders", set()):
+                raise ValueError("Region scope requires queryable orders.order_id")
+            if not {"order_id", "product_id"} <= self.allowed_columns.get(
+                "order_items", set()
+            ):
+                raise ValueError(
+                    "Region scope requires queryable order_items order/product IDs"
+                )
+            for table, column in {
+                **self.region_columns,
+                **self.order_scope_columns,
+                **self.product_scope_columns,
+            }.items():
+                if column not in self.allowed_columns.get(table, set()):
+                    raise ValueError("Region policy columns must be queryable")
         if tenant_id is not None:
             if not isinstance(tenant_id, str) or not tenant_id:
                 raise ValueError("A nonempty server-owned tenant ID is required")
             if set(self.tenant_columns) != self.allowed_tables:
                 raise ValueError("Every allowed table needs a tenant column")
             if set(self.allowed_columns) != self.allowed_tables:
-                raise ValueError("Tenant-scoped mode requires explicit column allowlists")
+                raise ValueError(
+                    "Tenant-scoped mode requires explicit column allowlists"
+                )
             identifiers = [
                 *self.allowed_tables,
                 *self.tenant_columns.values(),
                 *(col for cols in self.allowed_columns.values() for col in cols),
+                *self.region_columns.values(),
+                *self.order_scope_columns.values(),
+                *self.product_scope_columns.values(),
             ]
-            if any(not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,63}", x)
-                   for x in identifiers):
+            if any(
+                not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,63}", x) for x in identifiers
+            ):
                 raise ValueError("Tenant-scoped mode requires simple SQL identifiers")
         self.max_rows = max_rows
         self.timeout_ms = timeout_ms
@@ -113,12 +188,36 @@ class GuardedSQLiteQuery:
     def run(self, sql: str) -> dict[str, Any]:
         started = time.monotonic()
         if not isinstance(sql, str) or not re.match(r"^\s*(select|with)\b", sql, re.I):
-            self._emit_audit(sql=str(sql), status="rejected", duration_ms=0, reason="statement_type")
+            self._emit_audit(
+                sql=str(sql), status="rejected", duration_ms=0, reason="statement_type"
+            )
             raise QueryRejected("Only SELECT queries and read-only CTEs are permitted")
 
         # SQLite execute() rejects multiple statements. Wrapping the generated SQL
         # lets the server enforce its own LIMIT even if the model supplied another one.
         stripped_sql = sql.strip().rstrip(";")
+        try:
+            statements = sqlglot.parse(stripped_sql, read="sqlite")
+        except SqlglotError as error:
+            self._emit_audit(sql=sql, status="rejected", duration_ms=0, reason="syntax")
+            raise QueryRejected("SQL rejected by the demo query policy") from error
+        if len(statements) != 1 or not isinstance(statements[0], exp.Query):
+            self._emit_audit(
+                sql=sql, status="rejected", duration_ms=0, reason="statement_type"
+            )
+            raise QueryRejected("Only one read-only SELECT query is permitted")
+        if any(
+            cte.alias_or_name.casefold() in self.allowed_tables
+            for cte in statements[0].find_all(exp.CTE)
+        ):
+            self._emit_audit(
+                sql=sql,
+                status="rejected",
+                duration_ms=0,
+                reason="reserved_cte_name",
+            )
+            raise QueryRejected("CTE names cannot shadow protected tables")
+
         query = f"SELECT * FROM ({stripped_sql}) LIMIT ?"
         uri_path = quote(str(self.database_path), safe="/")
         db_uri = f"file:{uri_path}?mode=ro"
@@ -131,18 +230,45 @@ class GuardedSQLiteQuery:
                     # A TEMP view shadows every exposed main table. The tenant
                     # value is stored in the connection, not interpolated into SQL.
                     conn.create_function(
-                        "current_tenant", 0, lambda: self.tenant_id,
+                        "current_tenant",
+                        0,
+                        lambda: self.tenant_id,
                     )
+                    if self.region_id is not None:
+                        conn.create_function(
+                            "current_region",
+                            0,
+                            lambda: self.region_id,
+                        )
                     for table in sorted(self.allowed_tables):
                         selected = ", ".join(
                             '"' + col + '"'
                             for col in sorted(self.allowed_columns[table])
                         )
                         tenant_col = '"' + self.tenant_columns[table] + '"'
+                        where_clause = f"{tenant_col} = current_tenant()"
+                        if self.region_id is not None:
+                            if table in self.region_columns:
+                                region_col = '"' + self.region_columns[table] + '"'
+                                where_clause += f" AND {region_col} = current_region()"
+                            elif table in self.order_scope_columns:
+                                order_col = '"' + self.order_scope_columns[table] + '"'
+                                where_clause += (
+                                    f" AND {order_col} IN "
+                                    '(SELECT "order_id" FROM temp."orders")'
+                                )
+                            else:
+                                product_col = (
+                                    '"' + self.product_scope_columns[table] + '"'
+                                )
+                                where_clause += (
+                                    f" AND {product_col} IN "
+                                    '(SELECT "product_id" FROM temp."order_items")'
+                                )
                         conn.execute(
                             f'CREATE TEMP VIEW "{table}" AS SELECT {selected} '
                             f'FROM main."{table}" '
-                            f'WHERE {tenant_col} = current_tenant()'
+                            f"WHERE {where_clause}"
                         )
                 conn.execute("PRAGMA query_only = ON")
 
@@ -161,11 +287,14 @@ class GuardedSQLiteQuery:
                             if db == "main":
                                 # Only the trusted TEMP view may read raw tenant
                                 # rows; a direct "main.table" query is denied.
-                                if source != arg1:
+                                if source not in self.allowed_tables:
                                     return sqlite3.SQLITE_DENY
                                 allowed = columns | {self.tenant_columns[arg1]}
-                                return (sqlite3.SQLITE_OK if arg2 in allowed or arg2 == ""
-                                        else sqlite3.SQLITE_DENY)
+                                return (
+                                    sqlite3.SQLITE_OK
+                                    if arg2 in allowed or arg2 == ""
+                                    else sqlite3.SQLITE_DENY
+                                )
                             if db != "temp":
                                 return sqlite3.SQLITE_DENY
                         # Empty arg2 is SQLite's implicit read for count/limit.
@@ -177,11 +306,24 @@ class GuardedSQLiteQuery:
                     if action == sqlite3.SQLITE_FUNCTION:
                         name = (arg2 or "").lower()
                         if name == "current_tenant":
-                            return (sqlite3.SQLITE_OK if self.tenant_id is not None
-                                    and source in self.allowed_tables
-                                    else sqlite3.SQLITE_DENY)
-                        return (sqlite3.SQLITE_OK if name in _ALLOWED_FUNCTIONS
-                                else sqlite3.SQLITE_DENY)
+                            return (
+                                sqlite3.SQLITE_OK
+                                if self.tenant_id is not None
+                                and source in self.allowed_tables
+                                else sqlite3.SQLITE_DENY
+                            )
+                        if name == "current_region":
+                            return (
+                                sqlite3.SQLITE_OK
+                                if self.region_id is not None
+                                and source in self.allowed_tables
+                                else sqlite3.SQLITE_DENY
+                            )
+                        return (
+                            sqlite3.SQLITE_OK
+                            if name in _ALLOWED_FUNCTIONS
+                            else sqlite3.SQLITE_DENY
+                        )
                     return sqlite3.SQLITE_DENY
 
                 conn.set_authorizer(authorize)
@@ -204,8 +346,11 @@ class GuardedSQLiteQuery:
                 duration_ms=duration_ms,
                 reason="sqlite_authorizer_or_budget",
             )
-            # Database errors can include schema/data. Do not expose them to an LLM-facing API.
-            raise QueryRejected("SQL rejected, unauthorized, or exceeded its budget") from error
+            # Database errors can include schema/data. Do not expose them to an
+            # LLM-facing API.
+            raise QueryRejected(
+                "SQL rejected, unauthorized, or exceeded its budget"
+            ) from error
 
         duration_ms = int((time.monotonic() - started) * 1000)
         result = {

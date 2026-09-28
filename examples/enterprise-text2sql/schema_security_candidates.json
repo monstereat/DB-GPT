@@ -1,0 +1,17 @@
+{
+  "confidential_column": "SELECT internal_cost_cents FROM products",
+  "aliased_confidential_column": "SELECT p.internal_cost_cents AS cost FROM products p",
+  "cte_hidden_column": "WITH costs AS (SELECT internal_cost_cents AS value FROM products) SELECT value FROM costs",
+  "scalar_subquery_column": "SELECT (SELECT MAX(internal_cost_cents) FROM products) AS cost",
+  "table_wildcard": "SELECT * FROM products",
+  "qualified_table_wildcard": "SELECT p.* FROM products p",
+  "tenant_key_projection": "SELECT tenant_id FROM products",
+  "tenant_key_grouping": "SELECT COUNT(*) FROM products GROUP BY tenant_id",
+  "safe_count_star": "SELECT COUNT(*) FROM products",
+  "safe_tenant_key_join": "SELECT p.product_id FROM products p JOIN order_items i ON p.tenant_id = i.tenant_id",
+  "unregistered_view_alias": "SELECT hidden_cost FROM product_cost_view",
+  "unregistered_view_wildcard": "SELECT * FROM product_cost_view",
+  "registered_safe_view": "SELECT product_id FROM public_product_catalog",
+  "registered_view_sensitive_definition": "SELECT product_id FROM unsafe_product_catalog",
+  "registered_view_missing_definition": "SELECT product_id FROM missing_product_catalog"
+}

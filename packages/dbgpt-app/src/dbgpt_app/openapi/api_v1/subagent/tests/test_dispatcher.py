@@ -115,11 +115,21 @@ def test_build_sub_prompt_includes_context():
     assert "prior result: 42" in pt.template
 
 
+def test_build_sub_prompt_includes_server_business_context():
+    pt = _build_sub_prompt(
+        "analyze refunds",
+        None,
+        "<business_context>2.0.0 uses original order date</business_context>",
+    )
+
+    assert "2.0.0 uses original order date" in pt.template
+
+
 def test_subagent_tool_names_exclude_dispatch_and_todowrite():
     assert "dispatch_parallel_tasks" not in _SUBAGENT_FACTORY_TOOL_NAMES
     assert "todowrite" not in _SUBAGENT_FACTORY_TOOL_NAMES
-    # The 8 factory tools are all present.
-    assert len(_SUBAGENT_FACTORY_TOOL_NAMES) == 8
+    # The 10 factory tools are all present.
+    assert len(_SUBAGENT_FACTORY_TOOL_NAMES) == 10
 
 
 @pytest.mark.asyncio
@@ -154,12 +164,23 @@ async def test_build_sub_react_agent_isolation(monkeypatch):
 
     monkeypatch.setattr(react_mod, "ReActAgent", _FakeReActAgent)
 
+    from dbgpt.datasource.sql_guard import AgentSQLBudget
+
     fake_client = _make_fake_llm_client()
+    shared_budget = AgentSQLBudget(max_queries=4, max_runtime_seconds=20)
     agent_a, cid_a, state_a = await build_sub_react_agent(
-        "goal a", 0, parent_conv_id="parent123", llm_client=fake_client
+        "goal a",
+        0,
+        parent_conv_id="parent123",
+        llm_client=fake_client,
+        audit_context={"sql_execution_budget": shared_budget, "role": "sales"},
     )
     agent_b, cid_b, state_b = await build_sub_react_agent(
-        "goal b", 1, parent_conv_id="parent123", llm_client=fake_client
+        "goal b",
+        1,
+        parent_conv_id="parent123",
+        llm_client=fake_client,
+        audit_context={"sql_execution_budget": shared_budget, "role": "sales"},
     )
 
     # batch_id defaults to 0 when not passed (back-compat path).
@@ -167,6 +188,10 @@ async def test_build_sub_react_agent_isolation(monkeypatch):
     assert cid_b == "parent123__d0_sub_1"
     assert state_a is not state_b
     assert state_a["conv_id"] == "parent123__d0_sub_0"
+    assert state_a["sql_execution_budget"] is shared_budget
+    assert state_b["sql_execution_budget"] is shared_budget
+    assert state_a["role"] == "sales"
+    assert state_b["role"] == "sales"
 
     # Tool pack must contain Terminate, exclude dispatch/todowrite.
     tool_names = set(agent_a.tool_pack._resources.keys())

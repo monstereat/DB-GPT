@@ -1,6 +1,7 @@
 import { AttachmentMessageCards, type SessionFileSnapshot } from '@/modules/session-files';
 import MarkdownContext from '@/new-components/common/MarkdownContext';
 import { AttachedConnector } from '@/new-components/connector/types';
+import { buildSqlResultView } from '@/utils/react-sql-result';
 import {
   ApartmentOutlined,
   ApiOutlined,
@@ -34,7 +35,7 @@ import {
   SearchOutlined,
   TableOutlined,
 } from '@ant-design/icons';
-import { Button, Tooltip, message } from 'antd';
+import { Button, Table, Tooltip, message } from 'antd';
 import classNames from 'classnames';
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -100,6 +101,11 @@ export interface ArtifactItem {
   filePath?: string;
 }
 
+export interface ConversationSqlResult {
+  id: string;
+  content: unknown;
+}
+
 export interface ManusLeftPanelProps {
   sections: ThinkingSection[];
   activeStepId?: string | null;
@@ -107,6 +113,7 @@ export interface ManusLeftPanelProps {
   isWorking?: boolean;
   userQuery?: string;
   assistantText?: string;
+  sqlResults?: ConversationSqlResult[];
   /** Render incremental answer text without reparsing Markdown on every frame. */
   isAssistantStreaming?: boolean;
   modelName?: string;
@@ -1040,6 +1047,7 @@ const ManusLeftPanel: React.FC<ManusLeftPanelProps> = ({
   isWorking,
   userQuery,
   assistantText,
+  sqlResults,
   isAssistantStreaming = false,
   modelName,
   stepThoughts,
@@ -1252,6 +1260,32 @@ const ManusLeftPanel: React.FC<ManusLeftPanelProps> = ({
             )}
           </div>
         )}
+
+        {sqlResults?.map(result => {
+          const sqlResult = buildSqlResultView(result.content);
+          if (!sqlResult) return null;
+
+          return (
+            <div key={result.id} className='mt-4 px-1'>
+              <div className='mb-2 flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300'>
+                <TableOutlined className='text-blue-500' />
+                <span>数据库查询结果</span>
+              </div>
+              <Table
+                size='small'
+                pagination={{ pageSize: 10, showSizeChanger: true }}
+                columns={sqlResult.columns}
+                dataSource={sqlResult.rows}
+                rowKey='key'
+                scroll={{ x: 'max-content' }}
+                className='border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden'
+              />
+              <div className='mt-1 text-xs text-gray-500'>
+                共 {sqlResult.rowCount} 行{sqlResult.truncated ? '，结果已截断' : ''}
+              </div>
+            </div>
+          );
+        })}
 
         {createdSkillName && (
           <div className='mt-5 px-1'>

@@ -3,6 +3,7 @@ import logging
 from typing import List
 
 from dbgpt._private.config import Config
+from dbgpt.datasource.sql_guard import execute_read_only_query, sql_fingerprint
 from dbgpt_app.scene.chat_dashboard.data_preparation.report_schma import ValueItem
 
 CFG = Config()
@@ -10,15 +11,44 @@ logger = logging.getLogger(__name__)
 
 
 class DashboardDataLoader:
-    def get_sql_value(self, db_conn, chart_sql: str):
-        return db_conn.query_ex(chart_sql)
+    def get_sql_value(
+        self,
+        db_conn,
+        chart_sql: str,
+        audit_context=None,
+        verified_execution_context=None,
+        span_name="dashboard.sql_query",
+    ):
+        result = execute_read_only_query(
+            db_conn,
+            chart_sql,
+            audit_context=audit_context,
+            verified_execution_context=verified_execution_context,
+            span_name=span_name,
+        )
+        return list(result.columns), result.rows
 
-    def get_chart_values_by_conn(self, db_conn, chart_sql: str):
-        field_names, datas = db_conn.query_ex(chart_sql)
+    def get_chart_values_by_conn(
+        self,
+        db_conn,
+        chart_sql: str,
+        audit_context=None,
+        verified_execution_context=None,
+        span_name="dashboard.sql_query",
+    ):
+        result = execute_read_only_query(
+            db_conn,
+            chart_sql,
+            audit_context=audit_context,
+            verified_execution_context=verified_execution_context,
+            span_name=span_name,
+        )
+        field_names, datas = list(result.columns), result.rows
         return self.get_chart_values_by_data(field_names, datas, chart_sql)
 
     def get_chart_values_by_data(self, field_names, datas, chart_sql: str):
-        logger.info(f"get_chart_values_by_conn:{chart_sql}")
+        query_sha256 = sql_fingerprint(chart_sql)
+        logger.info("get_chart_values_by_conn query_sha256=%s", query_sha256)
         try:
             values: List[ValueItem] = []
             if not datas:
@@ -118,6 +148,11 @@ class DashboardDataLoader:
             raise e
 
     def get_chart_values_by_db(self, db_name: str, chart_sql: str):
-        logger.info(f"get_chart_values_by_db:{db_name},{chart_sql}")
+        query_sha256 = sql_fingerprint(chart_sql)
+        logger.info(
+            "get_chart_values_by_db db_name=%s query_sha256=%s",
+            db_name,
+            query_sha256,
+        )
         db_conn = CFG.local_db_manager.get_connector(db_name)
         return self.get_chart_values_by_conn(db_conn, chart_sql)

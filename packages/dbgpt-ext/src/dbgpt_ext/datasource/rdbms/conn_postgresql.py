@@ -125,9 +125,10 @@ class PostgreSQLConnector(RDBMSConnector):
             view_results = set(row[0] for row in view_results)
             self._all_tables = table_results.union(view_results)
 
-            # Reflect with schema
-            self._metadata.reflect(bind=self._engine, schema=schema)
-            return self._all_tables
+        # Reflect after releasing the session connection. A single-connection
+        # pool cannot lend a second connection while the session is still open.
+        self._metadata.reflect(bind=self._engine, schema=schema)
+        return self._all_tables
 
     def get_grants(self):
         """Get grants."""

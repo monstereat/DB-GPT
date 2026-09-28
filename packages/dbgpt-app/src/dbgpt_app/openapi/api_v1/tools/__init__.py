@@ -8,6 +8,8 @@ from .kb_tools import make_kb_tools
 from .knowledge_retrieve import make_knowledge_retrieve
 from .load_file import make_load_file
 from .load_tools import make_load_tools
+from .metric_catalog import make_metric_catalog
+from .metric_query import make_metric_query
 from .question import make_question
 from .read_file import make_read_file
 from .select_skill import make_select_skill
@@ -25,6 +27,8 @@ __all__ = [
     "make_knowledge_retrieve",
     "make_load_file",
     "make_load_tools",
+    "make_metric_catalog",
+    "make_metric_query",
     "make_question",
     "make_read_file",
     "make_select_skill",

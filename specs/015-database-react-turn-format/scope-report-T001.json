@@ -1,0 +1,24 @@
+{
+  "base_commit": "93da908aa2ba936909a70d7b083ab6455f8a0a85",
+  "baseline": "/Users/monster/Documents/GitHub/code/DB-GPT/specs/015-database-react-turn-format/scope-baseline-T001.json",
+  "new_files": [],
+  "modified_preexisting_files": [
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/agentic_data_api.py",
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tests/test_database_workflow_prompt.py"
+  ],
+  "touched_files": [
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/agentic_data_api.py",
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tests/test_database_workflow_prompt.py"
+  ],
+  "allow_patterns": [
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/agentic_data_api.py",
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tests/test_database_workflow_prompt.py",
+    "specs/015-database-react-turn-format/**"
+  ],
+  "internal_patterns": [
+    "specs/015-database-react-turn-format/**",
+    "specs/015-database-react-turn-format/scope-baseline-T001.json"
+  ],
+  "outside_scope": [],
+  "passed": true
+}

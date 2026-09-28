@@ -1,0 +1,31 @@
+{
+  "base_commit": "93da908aa2ba936909a70d7b083ab6455f8a0a85",
+  "baseline": "/Users/monster/Documents/GitHub/code/DB-GPT/specs/018-metric-query-tenant-join/scope-baseline-T001.json",
+  "new_files": [
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/tests/test_metric_query.py"
+  ],
+  "modified_preexisting_files": [
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/agentic_data_api.py",
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tests/test_database_workflow_prompt.py",
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/metric_query.py"
+  ],
+  "touched_files": [
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/tests/test_metric_query.py",
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/agentic_data_api.py",
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tests/test_database_workflow_prompt.py",
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/metric_query.py"
+  ],
+  "allow_patterns": [
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/agentic_data_api.py",
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/metric_query.py",
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tests/test_database_workflow_prompt.py",
+    "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/tests/test_metric_query.py",
+    "specs/018-metric-query-tenant-join/**"
+  ],
+  "internal_patterns": [
+    "specs/018-metric-query-tenant-join/**",
+    "specs/018-metric-query-tenant-join/scope-baseline-T001.json"
+  ],
+  "outside_scope": [],
+  "passed": true
+}

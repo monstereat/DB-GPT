@@ -105,6 +105,31 @@ class Terminate(Action[None], BaseTool):
         return self.execute(*args, **kwargs)
 
 
+def _non_retryable_sql_error(
+    action: Optional[str], observation: Optional[str]
+) -> Optional[str]:
+    """Return a safe terminal message for a structured permanent SQL error."""
+    if not isinstance(action, str) or action.strip().lower() != "sql_query":
+        return None
+    if not isinstance(observation, str):
+        return None
+    try:
+        result = json.loads(observation)
+    except (TypeError, json.JSONDecodeError):
+        return None
+    if not isinstance(result, dict):
+        return None
+    error = result.get("error")
+    if not isinstance(error, dict) or error.get("retryable") is not False:
+        return None
+    message = error.get("message")
+    return (
+        message.strip()
+        if isinstance(message, str) and message.strip()
+        else "SQL 查询失败，已停止自动重试。"
+    )
+
+
 class ReActAction(ToolAction):
     """React action class."""
 
@@ -157,6 +182,12 @@ class ReActAction(ToolAction):
         act_out = await self._do_run(ai_message, step, need_vis_render=need_vis_render)
         if not act_out.action:
             act_out.action = step.action
+        sql_error = _non_retryable_sql_error(step.action, act_out.observations)
+        if sql_error is not None:
+            act_out.is_exe_success = False
+            act_out.have_retry = False
+            act_out.terminate = True
+            act_out.content = sql_error
         if step.thought:
             act_out.thoughts = step.thought
         if step.phase:

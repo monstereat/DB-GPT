@@ -10,6 +10,8 @@ import os
 import re
 from typing import Optional, Tuple
 
+__test__ = False
+
 logger = logging.getLogger(__name__)
 
 _ENV_PATTERN = re.compile(r"\$\{env:([A-Za-z0-9_]+)(?::-(.*?))?\}")

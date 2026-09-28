@@ -1,0 +1,397 @@
+{
+  "schema_version": 2,
+  "change_id": "015-database-react-turn-format",
+  "mode": "standard",
+  "status": "executing",
+  "current_task": null,
+  "waiting_for": null,
+  "artifacts": {
+    "spec": "specs/015-database-react-turn-format/spec.md",
+    "plan": "specs/015-database-react-turn-format/plan.md",
+    "tasks": "specs/015-database-react-turn-format/tasks.md",
+    "verify": "specs/015-database-react-turn-format/verify.md"
+  },
+  "controls": {
+    "commit_strategy": "none",
+    "branch": null,
+    "independent_review": "off"
+  },
+  "approvals": {
+    "spec": {
+      "at": "2026-09-26T21:10:05Z",
+      "approver": "主人（既有目标授权）",
+      "evidence": "用户授权修复 DB-GPT 对话生成错误；本变更基于代码中已验证的第二组互相矛盾的 ReAct 格式要求。",
+      "review_report": null
+    },
+    "plan": {
+      "at": "2026-09-26T21:10:05Z",
+      "approver": "主人（既有目标授权）",
+      "evidence": "用户授权按判断完成本地修复；Plan 与观测到的 parser 协议要求一一对应，并用定向回归验证。",
+      "review_report": null
+    },
+    "acceptance": null
+  },
+  "acceptance_criteria": {
+    "AC-01": {
+      "description": "Database prompt includes all required action fields, final Phase, and the core terminate result schema."
+    },
+    "AC-02": {
+      "description": "Focused prompt-builder and ReAct lifecycle tests pass."
+    }
+  },
+  "tasks": {
+    "T001": {
+      "depends_on": [],
+      "acceptance_criteria": [
+        "AC-01",
+        "AC-02"
+      ],
+      "allowed_paths": [
+        "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/agentic_data_api.py",
+        "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tests/test_database_workflow_prompt.py",
+        "specs/015-database-react-turn-format/**"
+      ],
+      "commands": [
+        "PYTHONPATH=packages/dbgpt-core/src:packages/dbgpt-serve/src:packages/dbgpt-app/src:packages/dbgpt-ext/src .venv/bin/python -m pytest -q -o addopts='' packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tests/test_database_workflow_prompt.py packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tests/test_agentic_data_api_lifecycle.py"
+      ],
+      "status": "done",
+      "check_ids": [
+        "T001-prompt-lifecycle-tests",
+        "T001-prompt-contract-tests"
+      ],
+      "scope": {
+        "baseline": "/Users/monster/Documents/GitHub/code/DB-GPT/specs/015-database-react-turn-format/scope-baseline-T001.json",
+        "cwd": "/Users/monster/Documents/GitHub/code/DB-GPT",
+        "internal_patterns": [
+          "specs/015-database-react-turn-format/**"
+        ]
+      },
+      "scope_report": {
+        "path": "/Users/monster/Documents/GitHub/code/DB-GPT/specs/015-database-react-turn-format/scope-report-T001.json",
+        "sha256": "242b8e568ee6c2a37c379b45743d821415aa364b5e7baaa641761adbe6653165"
+      }
+    }
+  },
+  "checks": [
+    {
+      "id": "T001-prompt-lifecycle-tests",
+      "type": "command",
+      "kind": "unit",
+      "task": "T001",
+      "acceptance_criteria": [
+        "AC-02"
+      ],
+      "command": "PYTHONPATH=packages/dbgpt-core/src:packages/dbgpt-serve/src:packages/dbgpt-app/src:packages/dbgpt-ext/src .venv/bin/python -m pytest -q -o addopts='' packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tests/test_database_workflow_prompt.py packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tests/test_agentic_data_api_lifecycle.py",
+      "cwd": "/Users/monster/Documents/GitHub/code/DB-GPT",
+      "started_at": "2026-09-26T21:10:30Z",
+      "duration_ms": 1993,
+      "exit_code": 0,
+      "result": "pass",
+      "stdout_log": "specs/015-database-react-turn-format/evidence/T001-prompt-lifecycle-tests.stdout.log",
+      "stderr_log": "specs/015-database-react-turn-format/evidence/T001-prompt-lifecycle-tests.stderr.log",
+      "git": {
+        "head": "93da908aa2ba936909a70d7b083ab6455f8a0a85",
+        "changed_files": [
+          ".github/workflows/develop-me-sql-guard.yml",
+          ".gitignore",
+          "assets/schema/dbgpt.sql",
+          "assets/schema/upgrade/v0_8_2/upgrade_to_v0.8.2.sql",
+          "assets/schema/upgrade/v0_8_2/v0.8.2.sql",
+          "docker/base/Dockerfile",
+          "docs/develop-me-roadmap.md",
+          "examples/enterprise-text2sql/README.md",
+          "examples/enterprise-text2sql/ecommerce_demo.py",
+          "examples/enterprise-text2sql/evaluate_candidates.py",
+          "examples/enterprise-text2sql/gold_candidates.json",
+          "examples/enterprise-text2sql/guarded_query.py",
+          "examples/enterprise-text2sql/test_ecommerce_demo.py",
+          "examples/enterprise-text2sql/test_evaluate_candidates.py",
+          "examples/enterprise-text2sql/test_guarded_query.py",
+          "packages/dbgpt-app/hatch_build.py",
+          "packages/dbgpt-app/src/dbgpt_app/component_configs.py",
+          "packages/dbgpt-app/src/dbgpt_app/initialization/db_model_initialization.py",
+          "packages/dbgpt-app/src/dbgpt_app/initialization/workspace_provisioning.py",
+          "packages/dbgpt-app/src/dbgpt_app/knowledge/api.py",
+          "packages/dbgpt-app/src/dbgpt_app/knowledge/service.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/agentic_data_api.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/api_v1.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/editor/api_editor_v1.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/editor/service.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/editor/tests/test_chart_run.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/subagent/dispatcher.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/subagent/react_tools.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/subagent/tests/test_dispatch_tool.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/subagent/tests/test_dispatcher.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/subagent/tests/test_react_tools.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tests/test_agentic_data_api_lifecycle.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/__init__.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/code_interpreter.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/execute_analysis.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/execute_tool.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/html_interpreter.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/kb_tools.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/knowledge_retrieve.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/load_file.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/load_tools.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/question.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/read_file.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/select_skill.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/shell_interpreter.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/skill_tools.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/sql_query.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/tests/test_session_file_tools.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/todowrite.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v2.py",
+          "packages/dbgpt-app/src/dbgpt_app/scene/base_chat.py",
+          "packages/dbgpt-app/src/dbgpt_app/scene/chat_dashboard/chat.py",
+          "packages/dbgpt-app/src/dbgpt_app/scene/chat_dashboard/data_loader.py",
+          "packages/dbgpt-app/src/dbgpt_app/tests/test_agentic_multi_file_flow.py",
+          "packages/dbgpt-app/src/dbgpt_app/tests/test_agentic_multi_file_security.py",
+          "packages/dbgpt-app/src/dbgpt_app/tests/test_attachment_react_adapter.py",
+          "packages/dbgpt-core/pyproject.toml",
+          "packages/dbgpt-core/src/dbgpt/agent/resource/database.py",
+          "packages/dbgpt-core/src/dbgpt/agent/resource/manage.py",
+          "packages/dbgpt-core/src/dbgpt/agent/resource/tool/pack.py",
+          "packages/dbgpt-core/src/dbgpt/agent/resource/tool/tests/test_base_tool.py",
+          "packages/dbgpt-core/src/dbgpt/core/awel/trigger/http_trigger.py",
+          "packages/dbgpt-core/src/dbgpt/core/interface/operators/llm_operator.py",
+          "packages/dbgpt-core/src/dbgpt/datasource/rdbms/base.py",
+          "packages/dbgpt-core/src/dbgpt/model/operators/llm_operator.py",
+          "packages/dbgpt-core/src/dbgpt/model/proxy/llms/ollama.py",
+          "packages/dbgpt-core/src/dbgpt/model/utils/provider_test.py",
+          "packages/dbgpt-core/src/dbgpt/rag/extractor/summary.py",
+          "packages/dbgpt-core/src/dbgpt/rag/extractor/tests/test_summary_extractor.py",
+          "packages/dbgpt-core/src/dbgpt/rag/retriever/rewrite.py",
+          "packages/dbgpt-core/src/dbgpt/rag/transformer/llm_extractor.py",
+          "packages/dbgpt-core/src/dbgpt/util/tracer/tests/test_tracer_impl.py",
+          "packages/dbgpt-core/src/dbgpt/util/tracer/tracer_impl.py",
+          "packages/dbgpt-core/src/dbgpt/util/tracer/tracer_middleware.py",
+          "packages/dbgpt-ext/src/dbgpt_ext/datasource/conn_spark.py",
+          "packages/dbgpt-ext/src/dbgpt_ext/datasource/rdbms/conn_postgresql.py",
+          "packages/dbgpt-ext/src/dbgpt_ext/datasource/rdbms/tests/test_conn_sqlite.py",
+          "packages/dbgpt-serve/pyproject.toml",
+          "packages/dbgpt-serve/src/dbgpt_serve/agent/agents/app_agent_manage.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/agent/agents/controller.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/agent/agents/expand/actions/volatility_analysis_action.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/agent/resource/datasource.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/datasource/api/endpoints.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/datasource/api/schemas.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/datasource/manages/connect_config_db.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/datasource/manages/connector_manager.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/datasource/service/service.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/evaluate/api/endpoints.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/flow/api/endpoints.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/flow/tests/test_endpoints.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/prompt/api/endpoints.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/prompt/service/service.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/prompt/tests/test_endpoints.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/rag/api/endpoints.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/rag/retriever/knowledge_space.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/rag/service/service.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/rag/tests/test_service.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/utils/auth.py",
+          "uv.lock"
+        ],
+        "diff_sha256": "178933f871e0611b6d472bc596b81968571665cb81abaf637958d0579a27337c"
+      }
+    },
+    {
+      "id": "T001-prompt-contract-tests",
+      "type": "command",
+      "kind": "unit",
+      "task": "T001",
+      "acceptance_criteria": [
+        "AC-01"
+      ],
+      "command": "PYTHONPATH=packages/dbgpt-core/src:packages/dbgpt-serve/src:packages/dbgpt-app/src:packages/dbgpt-ext/src .venv/bin/python -m pytest -q -o addopts='' packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tests/test_database_workflow_prompt.py packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tests/test_agentic_data_api_lifecycle.py",
+      "cwd": "/Users/monster/Documents/GitHub/code/DB-GPT",
+      "started_at": "2026-09-26T21:11:08Z",
+      "duration_ms": 1856,
+      "exit_code": 0,
+      "result": "pass",
+      "stdout_log": "specs/015-database-react-turn-format/evidence/T001-prompt-contract-tests.stdout.log",
+      "stderr_log": "specs/015-database-react-turn-format/evidence/T001-prompt-contract-tests.stderr.log",
+      "git": {
+        "head": "93da908aa2ba936909a70d7b083ab6455f8a0a85",
+        "changed_files": [
+          ".github/workflows/develop-me-sql-guard.yml",
+          ".gitignore",
+          "assets/schema/dbgpt.sql",
+          "assets/schema/upgrade/v0_8_2/upgrade_to_v0.8.2.sql",
+          "assets/schema/upgrade/v0_8_2/v0.8.2.sql",
+          "docker/base/Dockerfile",
+          "docs/develop-me-roadmap.md",
+          "examples/enterprise-text2sql/README.md",
+          "examples/enterprise-text2sql/ecommerce_demo.py",
+          "examples/enterprise-text2sql/evaluate_candidates.py",
+          "examples/enterprise-text2sql/gold_candidates.json",
+          "examples/enterprise-text2sql/guarded_query.py",
+          "examples/enterprise-text2sql/test_ecommerce_demo.py",
+          "examples/enterprise-text2sql/test_evaluate_candidates.py",
+          "examples/enterprise-text2sql/test_guarded_query.py",
+          "packages/dbgpt-app/hatch_build.py",
+          "packages/dbgpt-app/src/dbgpt_app/component_configs.py",
+          "packages/dbgpt-app/src/dbgpt_app/initialization/db_model_initialization.py",
+          "packages/dbgpt-app/src/dbgpt_app/initialization/workspace_provisioning.py",
+          "packages/dbgpt-app/src/dbgpt_app/knowledge/api.py",
+          "packages/dbgpt-app/src/dbgpt_app/knowledge/service.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/agentic_data_api.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/api_v1.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/editor/api_editor_v1.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/editor/service.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/editor/tests/test_chart_run.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/subagent/dispatcher.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/subagent/react_tools.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/subagent/tests/test_dispatch_tool.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/subagent/tests/test_dispatcher.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/subagent/tests/test_react_tools.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tests/test_agentic_data_api_lifecycle.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/__init__.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/code_interpreter.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/execute_analysis.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/execute_tool.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/html_interpreter.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/kb_tools.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/knowledge_retrieve.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/load_file.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/load_tools.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/question.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/read_file.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/select_skill.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/shell_interpreter.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/skill_tools.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/sql_query.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/tests/test_session_file_tools.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/todowrite.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v2.py",
+          "packages/dbgpt-app/src/dbgpt_app/scene/base_chat.py",
+          "packages/dbgpt-app/src/dbgpt_app/scene/chat_dashboard/chat.py",
+          "packages/dbgpt-app/src/dbgpt_app/scene/chat_dashboard/data_loader.py",
+          "packages/dbgpt-app/src/dbgpt_app/tests/test_agentic_multi_file_flow.py",
+          "packages/dbgpt-app/src/dbgpt_app/tests/test_agentic_multi_file_security.py",
+          "packages/dbgpt-app/src/dbgpt_app/tests/test_attachment_react_adapter.py",
+          "packages/dbgpt-core/pyproject.toml",
+          "packages/dbgpt-core/src/dbgpt/agent/resource/database.py",
+          "packages/dbgpt-core/src/dbgpt/agent/resource/manage.py",
+          "packages/dbgpt-core/src/dbgpt/agent/resource/tool/pack.py",
+          "packages/dbgpt-core/src/dbgpt/agent/resource/tool/tests/test_base_tool.py",
+          "packages/dbgpt-core/src/dbgpt/core/awel/trigger/http_trigger.py",
+          "packages/dbgpt-core/src/dbgpt/core/interface/operators/llm_operator.py",
+          "packages/dbgpt-core/src/dbgpt/datasource/rdbms/base.py",
+          "packages/dbgpt-core/src/dbgpt/model/operators/llm_operator.py",
+          "packages/dbgpt-core/src/dbgpt/model/proxy/llms/ollama.py",
+          "packages/dbgpt-core/src/dbgpt/model/utils/provider_test.py",
+          "packages/dbgpt-core/src/dbgpt/rag/extractor/summary.py",
+          "packages/dbgpt-core/src/dbgpt/rag/extractor/tests/test_summary_extractor.py",
+          "packages/dbgpt-core/src/dbgpt/rag/retriever/rewrite.py",
+          "packages/dbgpt-core/src/dbgpt/rag/transformer/llm_extractor.py",
+          "packages/dbgpt-core/src/dbgpt/util/tracer/tests/test_tracer_impl.py",
+          "packages/dbgpt-core/src/dbgpt/util/tracer/tracer_impl.py",
+          "packages/dbgpt-core/src/dbgpt/util/tracer/tracer_middleware.py",
+          "packages/dbgpt-ext/src/dbgpt_ext/datasource/conn_spark.py",
+          "packages/dbgpt-ext/src/dbgpt_ext/datasource/rdbms/conn_postgresql.py",
+          "packages/dbgpt-ext/src/dbgpt_ext/datasource/rdbms/tests/test_conn_sqlite.py",
+          "packages/dbgpt-serve/pyproject.toml",
+          "packages/dbgpt-serve/src/dbgpt_serve/agent/agents/app_agent_manage.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/agent/agents/controller.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/agent/agents/expand/actions/volatility_analysis_action.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/agent/resource/datasource.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/datasource/api/endpoints.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/datasource/api/schemas.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/datasource/manages/connect_config_db.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/datasource/manages/connector_manager.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/datasource/service/service.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/evaluate/api/endpoints.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/flow/api/endpoints.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/flow/tests/test_endpoints.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/prompt/api/endpoints.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/prompt/service/service.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/prompt/tests/test_endpoints.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/rag/api/endpoints.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/rag/retriever/knowledge_space.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/rag/service/service.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/rag/tests/test_service.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/utils/auth.py",
+          "uv.lock"
+        ],
+        "diff_sha256": "178933f871e0611b6d472bc596b81968571665cb81abaf637958d0579a27337c"
+      }
+    }
+  ],
+  "events": [
+    {
+      "at": "2026-09-26T21:10:05Z",
+      "action": "init",
+      "status": "initialized",
+      "note": "State created."
+    },
+    {
+      "at": "2026-09-26T21:10:05Z",
+      "action": "set_draft",
+      "status": "spec_draft",
+      "note": "Capture the remaining database ReAct turn-format mismatch."
+    },
+    {
+      "at": "2026-09-26T21:10:05Z",
+      "action": "add_criterion",
+      "status": "spec_draft",
+      "note": "Registered AC-01."
+    },
+    {
+      "at": "2026-09-26T21:10:05Z",
+      "action": "add_criterion",
+      "status": "spec_draft",
+      "note": "Registered AC-02."
+    },
+    {
+      "at": "2026-09-26T21:10:05Z",
+      "action": "approve",
+      "status": "spec_approved",
+      "note": "spec approved by 主人（既有目标授权）: 用户授权修复 DB-GPT 对话生成错误；本变更基于代码中已验证的第二组互相矛盾的 ReAct 格式要求。"
+    },
+    {
+      "at": "2026-09-26T21:10:05Z",
+      "action": "set_draft",
+      "status": "plan_draft",
+      "note": "Plan changes only database prompt wording and its regression coverage."
+    },
+    {
+      "at": "2026-09-26T21:10:05Z",
+      "action": "add_task",
+      "status": "plan_draft",
+      "note": "Registered T001."
+    },
+    {
+      "at": "2026-09-26T21:10:05Z",
+      "action": "approve",
+      "status": "plan_approved",
+      "note": "plan approved by 主人（既有目标授权）: 用户授权按判断完成本地修复；Plan 与观测到的 parser 协议要求一一对应，并用定向回归验证。"
+    },
+    {
+      "at": "2026-09-26T21:10:06Z",
+      "action": "start_task",
+      "status": "executing",
+      "note": "Started T001."
+    },
+    {
+      "at": "2026-09-26T21:10:32Z",
+      "action": "run_check",
+      "status": "executing",
+      "note": "T001-prompt-lifecycle-tests: pass (PYTHONPATH=packages/dbgpt-core/src:packages/dbgpt-serve/src:packages/dbgpt-app/src:packages/dbgpt-ext/src .venv/bin/python -m pytest -q -o addopts='' packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tests/test_database_workflow_prompt.py packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tests/test_agentic_data_api_lifecycle.py)"
+    },
+    {
+      "at": "2026-09-26T21:11:10Z",
+      "action": "run_check",
+      "status": "executing",
+      "note": "T001-prompt-contract-tests: pass (PYTHONPATH=packages/dbgpt-core/src:packages/dbgpt-serve/src:packages/dbgpt-app/src:packages/dbgpt-ext/src .venv/bin/python -m pytest -q -o addopts='' packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tests/test_database_workflow_prompt.py packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tests/test_agentic_data_api_lifecycle.py)"
+    },
+    {
+      "at": "2026-09-26T21:11:23Z",
+      "action": "complete_task",
+      "status": "executing",
+      "note": "Completed T001 with T001-prompt-lifecycle-tests, T001-prompt-contract-tests."
+    }
+  ],
+  "created_at": "2026-09-26T21:10:05Z",
+  "updated_at": "2026-09-26T21:11:23Z"
+}

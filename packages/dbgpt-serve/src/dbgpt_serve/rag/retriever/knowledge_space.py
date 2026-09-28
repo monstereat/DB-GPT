@@ -110,7 +110,18 @@ class KnowledgeSpaceRetriever(BaseRetriever):
         worker_manager = self._system_app.get_component(
             ComponentType.WORKER_MANAGER_FACTORY, WorkerManagerFactory
         ).create()
-        return DefaultLLMClient(worker_manager, True)
+        llm_client = DefaultLLMClient(worker_manager, True)
+        from dbgpt.core.interface.operators.llm_operator import (
+            wrap_llm_client_for_current_context,
+        )
+        from dbgpt_serve.utils.token_quota import daily_token_quota_enabled
+
+        wrapped_client = wrap_llm_client_for_current_context(llm_client)
+        if daily_token_quota_enabled() and wrapped_client is llm_client:
+            raise RuntimeError(
+                "Daily token quota requires a metered knowledge retrieval client"
+            )
+        return wrapped_client
 
     def _retrieve(
         self, query: str, filters: Optional[MetadataFilters] = None

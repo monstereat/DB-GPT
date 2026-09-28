@@ -6,8 +6,11 @@ import pytest
 from typing_extensions import Annotated, Doc
 
 from dbgpt._private.pydantic import BaseModel, Field
+from dbgpt.agent.resource.tool.pack import ToolPack
+from dbgpt.util.tracer import root_tracer
 
 from ..base import BaseTool, FunctionTool, ToolParameter, tool
+from ..exceptions import ToolNotFoundException
 
 
 class TestBaseTool(BaseTool):
@@ -28,6 +31,101 @@ class TestBaseTool(BaseTool):
 
     async def async_execute(self, *args, **kwargs):
         return "async executed"
+
+
+def test_toolpack_sync_execution_emits_redacted_span(monkeypatch):
+    class _Span:
+        metadata = None
+
+    span = _Span()
+    started = {}
+
+    def start_span(name, *, span_type, metadata):
+        started.update(name=name, span_type=span_type, metadata=metadata)
+        return span
+
+    def end_span(_span, *, metadata):
+        span.metadata = metadata
+
+    def private_tool(customer_id: str) -> str:
+        """Return a private result."""
+        return "private result"
+
+    monkeypatch.setattr(root_tracer, "start_span", start_span)
+    monkeypatch.setattr(root_tracer, "end_span", end_span)
+    result = ToolPack([FunctionTool("private-tool-name", private_tool)]).execute(
+        resource_name="private-tool-name", customer_id="private-customer-id"
+    )
+
+    assert result == "private result"
+    assert started["name"] == "agent.toolpack.execute"
+    assert started["metadata"] == {}
+    assert span.metadata["status"] == "returned"
+    span_data = repr(started) + repr(span.metadata)
+    assert "private-tool-name" not in span_data
+    assert "private-customer-id" not in span_data
+    assert "private result" not in span_data
+
+
+@pytest.mark.asyncio
+async def test_toolpack_async_execution_emits_redacted_span(monkeypatch):
+    class _Span:
+        metadata = None
+
+    span = _Span()
+    started = {}
+
+    def start_span(name, *, span_type, metadata):
+        started.update(name=name, span_type=span_type, metadata=metadata)
+        return span
+
+    def end_span(_span, *, metadata):
+        span.metadata = metadata
+
+    async def private_tool(customer_id: str) -> str:
+        """Return a private result asynchronously."""
+        return "private async result"
+
+    monkeypatch.setattr(root_tracer, "start_span", start_span)
+    monkeypatch.setattr(root_tracer, "end_span", end_span)
+    tool_pack = ToolPack([FunctionTool("private-async-tool", private_tool)])
+    result = await tool_pack.async_execute(
+        resource_name="private-async-tool",
+        customer_id="private-customer-id",
+    )
+
+    assert result == "private async result"
+    assert started["name"] == "agent.toolpack.execute"
+    assert started["metadata"] == {}
+    assert span.metadata["status"] == "returned"
+    span_data = repr(started) + repr(span.metadata)
+    assert "private-async-tool" not in span_data
+    assert "private-customer-id" not in span_data
+    assert "private async result" not in span_data
+
+
+def test_toolpack_missing_tool_preserves_error_and_emits_failure_span(monkeypatch):
+    class _Span:
+        metadata = None
+
+    span = _Span()
+
+    monkeypatch.setattr(
+        root_tracer,
+        "start_span",
+        lambda _name, *, span_type, metadata: span,
+    )
+    monkeypatch.setattr(
+        root_tracer,
+        "end_span",
+        lambda _span, *, metadata: setattr(span, "metadata", metadata),
+    )
+
+    with pytest.raises(ToolNotFoundException):
+        ToolPack([]).execute(resource_name="private-missing-tool")
+
+    assert span.metadata["status"] == "failed"
+    assert "private-missing-tool" not in repr(span.metadata)
 
 
 def test_base_tool():

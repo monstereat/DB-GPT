@@ -16,6 +16,10 @@ from dbgpt.util.json_utils import compare_json_properties_ex, find_json_objects
 from dbgpt.util.pagination_utils import PaginationResult
 from dbgpt.util.tracer import root_tracer
 from dbgpt_serve.core import BaseService
+from dbgpt_serve.utils.token_quota_client import (
+    build_metered_llm_client_wrapper,
+    safe_token_quota_error,
+)
 
 from ..api.schemas import PromptDebugInput, PromptType, ServeRequest, ServerResponse
 from ..config import SERVE_SERVICE_COMPONENT_NAME, ServeConfig
@@ -271,7 +275,11 @@ class Service(BaseService[ServeEntity, ServeRequest, ServerResponse]):
         else:
             return None
 
-    async def debug_prompt(self, debug_input: PromptDebugInput):
+    async def debug_prompt(
+        self,
+        debug_input: PromptDebugInput,
+        token_quota_context: Optional[Dict[str, object]] = None,
+    ):
         logger.info(f"debug_prompt:{debug_input}")
         if not debug_input.user_input:
             raise ValueError("请输入你的提问!")
@@ -280,6 +288,9 @@ class Service(BaseService[ServeEntity, ServeRequest, ServerResponse]):
                 ComponentType.WORKER_MANAGER_FACTORY, WorkerManagerFactory
             ).create()
             llm_client = DefaultLLMClient(worker_manager, auto_convert_message=True)
+            wrap_client = build_metered_llm_client_wrapper(token_quota_context)
+            if wrap_client:
+                llm_client = wrap_client(llm_client)
         except Exception as e:
             raise ValueError("LLM prepare failed!", e)
 
@@ -356,6 +367,11 @@ class Service(BaseService[ServeEntity, ServeRequest, ServerResponse]):
                 yield f"data:{text}\n\n"
             yield "data:[DONE]\n\n"
         except Exception as e:
+            quota_error = safe_token_quota_error(e)
+            if quota_error:
+                yield f"data:{quota_error}\n\n"
+                yield "data:[DONE]\n\n"
+                return
             logger.error(f"Call LLMClient error, {str(e)}, detail: {payload}")
             raise ValueError(e)
         finally:

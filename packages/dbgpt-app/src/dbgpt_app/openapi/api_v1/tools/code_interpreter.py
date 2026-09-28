@@ -12,10 +12,12 @@ import logging
 import os
 import shutil
 import sys
+import time
 import uuid
 from typing import Any, Dict, List, Optional, Tuple
 
 from dbgpt.agent.resource.tool.base import tool
+from dbgpt.util.tracer import SpanType, root_tracer
 
 logger = logging.getLogger(__name__)
 
@@ -104,16 +106,7 @@ def _try_repair_truncated_code(raw_code: str) -> Optional[str]:
 
 
 def make_code_interpreter(react_state: Dict[str, Any]):
-    @tool(
-        description=(
-            "Execute Python code for data analysis and computation. "
-            "Supports pandas, numpy, matplotlib, json, os, etc. "
-            "Use this tool when you need to run Python code to process data, "
-            "generate charts, or perform calculations. "
-            'Parameters: {{"code": "python code string"}}'
-        )
-    )
-    async def code_interpreter(code: str) -> str:
+    async def _run_code_interpreter(code: str) -> Tuple[str, str]:
         """Execute arbitrary Python code and return stdout/stderr.
 
         CRITICAL: Each call is completely independent — variables do NOT
@@ -123,9 +116,16 @@ def make_code_interpreter(react_state: Dict[str, Any]):
         from dbgpt.configs.model_config import PILOT_PATH, STATIC_MESSAGE_IMG_PATH
 
         if not code or not code.strip():
-            return json.dumps(
-                {"chunks": [{"output_type": "text", "content": "No code provided"}]},
-                ensure_ascii=False,
+            return (
+                json.dumps(
+                    {
+                        "chunks": [
+                            {"output_type": "text", "content": "No code provided"}
+                        ]
+                    },
+                    ensure_ascii=False,
+                ),
+                "invalid_input",
             )
 
         cid = react_state.get("conv_id") or "default"
@@ -173,17 +173,21 @@ def make_code_interpreter(react_state: Dict[str, Any]):
                     "Please regenerate complete, syntactically valid Python code. "
                     "Keep code under 80 lines."
                 )
-                return json.dumps(
-                    {
-                        "chunks": [
-                            {"output_type": "code", "content": code.strip()},
-                            {"output_type": "text", "content": error_msg},
-                        ]
-                    },
-                    ensure_ascii=False,
+                return (
+                    json.dumps(
+                        {
+                            "chunks": [
+                                {"output_type": "code", "content": code.strip()},
+                                {"output_type": "text", "content": error_msg},
+                            ]
+                        },
+                        ensure_ascii=False,
+                    ),
+                    "syntax_error",
                 )
 
         output_text = ""
+        status = "completed"
         try:
             tmp_path = os.path.join(work_dir, "_run.py")
             with open(tmp_path, "w", encoding="utf-8") as tmp:
@@ -204,16 +208,21 @@ def make_code_interpreter(react_state: Dict[str, Any]):
 
             if returncode is None:
                 # ``_run_python_file`` returns ``None`` only on timeout.
+                status = "timeout"
                 output_text = (
                     f"Execution timed out ({EXECUTION_TIMEOUT_SECONDS}s limit)"
                 )
             elif returncode and error_text:
+                status = "execution_error"
                 output_text = (
                     output_text + "\n[ERROR]\n" + error_text
                     if output_text
                     else error_text
                 )
+            elif returncode:
+                status = "execution_error"
         except Exception as e:
+            status = "execution_error"
             output_text = f"Execution error: {e}"
 
         chunks: List[Dict[str, Any]] = [
@@ -274,6 +283,43 @@ def make_code_interpreter(react_state: Dict[str, Any]):
             )
             chunks.append({"output_type": "text", "content": img_summary})
 
-        return json.dumps({"chunks": chunks}, ensure_ascii=False)
+        return json.dumps({"chunks": chunks}, ensure_ascii=False), status
+
+    @tool(
+        description=(
+            "Execute Python code for data analysis and computation. "
+            "Supports pandas, numpy, matplotlib, json, os, etc. "
+            "Use this tool when you need to run Python code to process data, "
+            "generate charts, or perform calculations. "
+            'Parameters: {{"code": "python code string"}}'
+        )
+    )
+    async def code_interpreter(code: str) -> str:
+        started_at = time.monotonic()
+        span = None
+        status = "failed"
+        try:
+            try:
+                span = root_tracer.start_span(
+                    "agent.code_interpreter",
+                    span_type=SpanType.AGENT,
+                    metadata={},
+                )
+            except Exception:
+                logger.debug("Unable to start code interpreter span", exc_info=True)
+            result, status = await _run_code_interpreter(code)
+            return result
+        finally:
+            if span is not None:
+                try:
+                    root_tracer.end_span(
+                        span,
+                        metadata={
+                            "status": status,
+                            "elapsed_ms": int((time.monotonic() - started_at) * 1000),
+                        },
+                    )
+                except Exception:
+                    logger.debug("Unable to end code interpreter span", exc_info=True)
 
     return code_interpreter

@@ -34,6 +34,7 @@ from dbgpt.agent.resource import ToolPack, tool
 from dbgpt.agent.util.llm.llm import LLMConfig, LLMStrategyType
 from dbgpt.agent.util.react_parser import ReActOutputParser
 from dbgpt.core import PromptTemplate
+from dbgpt.util.tracer import SpanType, root_tracer
 
 from .react_tools import make_react_tools
 from .result import attach_agent_attribution, extract_subagent_result
@@ -156,7 +157,7 @@ def _extract_sql_from_llm_reply(llm_reply: Any) -> Optional[str]:
     return None
 
 
-# Tool names a sub-agent is allowed to use. Taken from the factory's 8 tools
+# Tool names a sub-agent is allowed to use. Taken from the factory's tools
 # plus the module-level skill tools. Intentionally EXCLUDES
 # ``dispatch_parallel_tasks`` (anti-recursion fan-out) and ``todowrite``
 # (sub-agents do not maintain a task list; it lives in the main loop).
@@ -164,6 +165,8 @@ _SUBAGENT_FACTORY_TOOL_NAMES = [
     "load_skill",
     "load_tools",
     "knowledge_retrieve",
+    "metric_catalog",
+    "metric_query",
     "sql_query",
     "code_interpreter",
     "shell_interpreter",
@@ -177,6 +180,7 @@ You are a DB-GPT sub-agent executing ONE focused sub-task delegated by a lead
 agent. You run in an isolated context — you CANNOT see the main conversation
 history. Everything you need is in the goal (and optional context) below.
 
+{business_context}
 ## Your sub-task goal
 {goal}
 {extra_context}
@@ -286,12 +290,21 @@ def _filter_readonly_connector_tools(
     return readonly
 
 
-def _build_sub_prompt(goal: str, extra_context: Optional[str]) -> PromptTemplate:
+def _build_sub_prompt(
+    goal: str,
+    extra_context: Optional[str],
+    business_context: Optional[str] = None,
+) -> PromptTemplate:
     """Build the sub-agent system prompt from goal + optional context."""
     ctx_block = ""
     if extra_context and extra_context.strip():
         ctx_block = f"\n## Shared context from the lead agent\n{extra_context}\n"
-    text = _SUB_AGENT_PROMPT_TEMPLATE.format(goal=goal, extra_context=ctx_block)
+    business_context_block = business_context or ""
+    text = _SUB_AGENT_PROMPT_TEMPLATE.format(
+        goal=goal,
+        extra_context=ctx_block,
+        business_context=business_context_block,
+    )
     return PromptTemplate(template=text, input_variables=[], template_format="jinja2")
 
 
@@ -307,6 +320,8 @@ async def build_sub_react_agent(
     readonly_connector_tools: Optional[List[Any]] = None,
     extra_context: Optional[str] = None,
     batch_id: int = 0,
+    audit_context: Optional[Dict[str, Any]] = None,
+    business_context: Optional[str] = None,
 ):
     """Construct an isolated child ReActAgent for one sub-task.
 
@@ -342,7 +357,12 @@ async def build_sub_react_agent(
 
     # (2) Independent react_state — artifact bookkeeping isolation. A fresh
     # dict means generated_images / image_url_map etc. never cross-write.
-    sub_state = {"conv_id": sub_conv_id, "file_path": None}
+    sub_state = {
+        **(audit_context or {}),
+        "conv_id": sub_conv_id,
+        "trace_id": sub_conv_id,
+        "file_path": None,
+    }
 
     # (3) Independent AgentMemory — not cached in REACT_AGENT_MEMORY_CACHE,
     # so the sub-agent's history never pollutes the parent's memory.
@@ -353,7 +373,7 @@ async def build_sub_react_agent(
     sub_gpt_memory.init(sub_conv_id, enable_vis_message=False)
     sub_agent_memory = AgentMemory(gpts_memory=sub_gpt_memory)
 
-    # (4) Independent tool set — factory rebuilds the 8 tools capturing
+    # (4) Independent tool set — factory rebuilds the 10 tools capturing
     # sub_state. Shared read-only DB / knowledge resources are passed through.
     # MCP/connector tools are shared objects (stateless per-call sessions),
     # already filtered to read-only by the caller.
@@ -393,7 +413,7 @@ async def build_sub_react_agent(
         .bind(sub_agent_memory)
         .bind(sub_llm_config)
         .bind(sub_tool_pack)
-        .bind(_build_sub_prompt(sub_goal, extra_context))
+        .bind(_build_sub_prompt(sub_goal, extra_context, business_context))
         .build()
     )
     return sub_agent, sub_conv_id, sub_state
@@ -493,6 +513,8 @@ def make_dispatch_tool(
     knowledge_resources: Any = None,
     connector_tool_extras: Optional[List[Any]] = None,
     connector_manager: Any = None,
+    audit_context: Optional[Dict[str, Any]] = None,
+    business_context: Optional[str] = None,
     emit_event: Any,
     max_parallel: int = 3,
 ):
@@ -561,10 +583,53 @@ def make_dispatch_tool(
         # sub-agent's id / conv_id so repeated dispatches never collide.
         _dispatch_counter += 1
         batch_id = _dispatch_counter
+        try:
+            dispatch_parent_span_id = root_tracer.get_current_span_id()
+        except Exception:
+            dispatch_parent_span_id = None
 
         async def run_one(idx: int, t: dict) -> dict:
             started_at = time.monotonic()
             agent_id = f"sub_d{batch_id}_{idx}"
+            span = None
+            try:
+                span = root_tracer.start_span(
+                    "agent.subagent_dispatch",
+                    parent_span_id=dispatch_parent_span_id,
+                    span_type=SpanType.AGENT,
+                    metadata={
+                        "agent_id": agent_id,
+                        "dispatch_batch_id": batch_id,
+                        "subagent_index": idx,
+                    },
+                )
+            except Exception:
+                logger.debug("Unable to start sub-agent dispatch span", exc_info=True)
+            status = "failed"
+            try:
+                result = await run_one_impl(idx, t, started_at, agent_id)
+                status = result.get("status", "unknown")
+                return result
+            finally:
+                if span is not None:
+                    try:
+                        root_tracer.end_span(
+                            span,
+                            metadata={
+                                "status": status,
+                                "elapsed_ms": int(
+                                    (time.monotonic() - started_at) * 1000
+                                ),
+                            },
+                        )
+                    except Exception:
+                        logger.debug(
+                            "Unable to end sub-agent dispatch span", exc_info=True
+                        )
+
+        async def run_one_impl(
+            idx: int, t: dict, started_at: float, agent_id: str
+        ) -> dict:
             title = (
                 t.get("title") if isinstance(t, dict) else None
             ) or f"子任务{idx + 1}"
@@ -592,6 +657,8 @@ def make_dispatch_tool(
                     readonly_connector_tools=readonly_connector_tools,
                     extra_context=extra,
                     batch_id=batch_id,
+                    audit_context=audit_context,
+                    business_context=business_context,
                 )
                 from dbgpt.agent import AgentMessage
 

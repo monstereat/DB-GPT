@@ -21,6 +21,7 @@ from dbgpt_serve.evaluate.service.fetchdata.benchmark_data_manager import (
     get_benchmark_manager,
 )
 from dbgpt_serve.evaluate.service.service import Service
+from dbgpt_serve.utils.token_quota import reject_unmetered_model_call
 
 from ...prompt.service.service import Service as PromptService
 from ..service.benchmark.benchmark_service import (
@@ -189,6 +190,7 @@ async def evaluation(
     Returns:
         ServerResponse: The response
     """
+    reject_unmetered_model_call("evaluation")
     return Result.succ(
         await service.run_evaluation(
             request.scene_key,
@@ -268,6 +270,7 @@ async def execute_benchmark_task(
     Returns:
         Result: The response
     """
+    reject_unmetered_model_call("benchmark execution")
     background_tasks.add_task(_run_benchmark_task_sync, service, request)
 
     # 立即返回成功响应

@@ -3,11 +3,13 @@
 import logging
 import os
 import ssl
+import time
 from typing import Any, Callable, Dict, List, Optional, Sequence, Type, Union, cast
 
 from mcp import ClientSession
 
 from dbgpt.util.json_utils import parse_or_raise_error
+from dbgpt.util.tracer import SpanType, root_tracer
 
 from ...util.mcp_utils import mcp_transport_client
 from ..base import EXECUTE_ARGS_TYPE, PARSE_EXECUTE_ARGS_FUNCTION, ResourceType, T
@@ -18,6 +20,31 @@ from .exceptions import ToolExecutionException, ToolNotFoundException
 ToolResourceType = Union[Resource, BaseTool, List[BaseTool], ToolFunc, List[ToolFunc]]
 
 logger = logging.getLogger(__name__)
+
+
+def _start_tool_execution_span():
+    try:
+        return root_tracer.start_span(
+            "agent.toolpack.execute", span_type=SpanType.AGENT, metadata={}
+        )
+    except Exception:
+        logger.debug("Unable to start tool execution span", exc_info=True)
+        return None
+
+
+def _end_tool_execution_span(span, status: str, started_at: float) -> None:
+    if span is None:
+        return
+    try:
+        root_tracer.end_span(
+            span,
+            metadata={
+                "status": status,
+                "elapsed_ms": int((time.monotonic() - started_at) * 1000),
+            },
+        )
+    except Exception:
+        logger.debug("Unable to end tool execution span", exc_info=True)
 
 
 def _is_function_tool(resources: Any) -> bool:
@@ -203,16 +230,24 @@ class ToolPack(ResourcePack):
         Returns:
             Any: The result of the tool execution.
         """
-        tl = self._get_execution_tool(resource_name)
+        started_at = time.monotonic()
+        span = _start_tool_execution_span()
+        status = "failed"
         try:
-            arguments = {k: v for k, v in kwargs.items()}
-            arguments = self._get_call_args(arguments, tl)
-            if tl.is_async:
-                raise ToolExecutionException("Async execution is not supported")
-            else:
-                return tl.execute(**arguments)
-        except Exception as e:
-            raise ToolExecutionException(f"Execution error: {str(e)}")
+            tl = self._get_execution_tool(resource_name)
+            try:
+                arguments = {k: v for k, v in kwargs.items()}
+                arguments = self._get_call_args(arguments, tl)
+                if tl.is_async:
+                    raise ToolExecutionException("Async execution is not supported")
+                else:
+                    result = tl.execute(**arguments)
+                    status = "returned"
+                    return result
+            except Exception as e:
+                raise ToolExecutionException(f"Execution error: {str(e)}")
+        finally:
+            _end_tool_execution_span(span, status, started_at)
 
     async def async_execute(
         self,
@@ -230,17 +265,25 @@ class ToolPack(ResourcePack):
         Returns:
             Any: The result of the tool execution.
         """
-        tl = self._get_execution_tool(resource_name)
+        started_at = time.monotonic()
+        span = _start_tool_execution_span()
+        status = "failed"
         try:
-            arguments = {k: v for k, v in kwargs.items()}
-            arguments = self._get_call_args(arguments, tl)
-            if tl.is_async:
-                return await tl.async_execute(**arguments)
-            else:
-                # TODO: Execute in a separate executor
-                return tl.execute(**arguments)
-        except Exception as e:
-            raise ToolExecutionException(f"Execution error: {str(e)}")
+            tl = self._get_execution_tool(resource_name)
+            try:
+                arguments = {k: v for k, v in kwargs.items()}
+                arguments = self._get_call_args(arguments, tl)
+                if tl.is_async:
+                    result = await tl.async_execute(**arguments)
+                else:
+                    # TODO: Execute in a separate executor
+                    result = tl.execute(**arguments)
+                status = "returned"
+                return result
+            except Exception as e:
+                raise ToolExecutionException(f"Execution error: {str(e)}")
+        finally:
+            _end_tool_execution_span(span, status, started_at)
 
     def is_terminal(self, resource_name: Optional[str] = None) -> bool:
         """Check if the tool is terminal."""

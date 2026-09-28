@@ -2,6 +2,7 @@
 
 import json
 import logging
+import os
 from enum import Enum
 from typing import (
     TYPE_CHECKING,
@@ -596,6 +597,15 @@ class HttpTrigger(Trigger):
         )
 
         async def _trigger_dag_func(body: Union[Request, BaseModel, str, None]):
+            if os.getenv("DBGPT_DAILY_TOKEN_LIMIT", "").strip():
+                from fastapi import HTTPException
+
+                raise HTTPException(
+                    status_code=503,
+                    detail=(
+                        "Daily token quota is not available for AWEL HTTP triggers"
+                    ),
+                )
             streaming_response = self._streaming_response
             if self._streaming_predict_func:
                 streaming_response = self._streaming_predict_func(body)

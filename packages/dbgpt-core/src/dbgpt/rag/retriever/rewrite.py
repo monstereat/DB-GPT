@@ -97,7 +97,9 @@ class QueryRewrite:
             context=context, original_query=origin_query, nums=nums
         )
         messages = [ModelMessage(role=ModelMessageRoleType.SYSTEM, content=prompt)]
-        request = ModelRequest(model=self._model_name, messages=messages)
+        request = ModelRequest(
+            model=self._model_name, messages=messages, max_new_tokens=128
+        )
         tasks = [self._llm_client.generate(request)]
         queries = await run_async_tasks(tasks=tasks, concurrency_limit=1)
         queries = [model_out.text for model_out in queries]

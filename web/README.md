@@ -54,7 +54,7 @@ yarn install
 ```sh
 cp .env.template .env
 ```
-edit the `API_BASE_URL` to the real address
+For same-origin deployments, leave `API_BASE_URL` empty. The Next.js server proxies `/api/v1` and `/api/v2` to `API_PROXY_TARGET` (default `http://127.0.0.1:5670`). The streaming Agent request uses `/api/agent-stream`, which forwards SSE chunks and aborts its upstream request when the browser disconnects; set `API_PROXY_TARGET` for both the Next.js build and runtime when DB-GPT listens elsewhere. Set `API_BASE_URL` only when the browser must call an external API origin directly.
 
 ```sh
 # development model

@@ -1,5 +1,6 @@
 import io
 import json
+import os
 from functools import cache
 from typing import Dict, List, Literal, Optional
 
@@ -426,6 +427,11 @@ async def debug_flow(
     flow_debug_request: FlowDebugRequest, service: Service = Depends(get_service)
 ):
     """Run the flow in debug mode."""
+    if os.getenv("DBGPT_DAILY_TOKEN_LIMIT", "").strip():
+        raise HTTPException(
+            status_code=503,
+            detail="Daily token quota is not available for flow debug",
+        )
     # Return the no-incremental stream by default
     stream_iter = service.debug_flow(flow_debug_request, default_incremental=False)
 

@@ -1,0 +1,70 @@
+[
+  {
+    "id": "south_q2_context",
+    "conversation_group": "south_q2_refund_rate",
+    "question": "第二季度华南区销售额和退款率分别是多少？",
+    "expected": {
+      "columns": [
+        "sales_cents",
+        "refund_rate_pct"
+      ],
+      "rows": [
+        [
+          77000,
+          6.1
+        ]
+      ]
+    },
+    "category": "multiturn_analysis"
+  },
+  {
+    "id": "south_q2_city_refund_followup",
+    "conversation_group": "south_q2_refund_rate",
+    "question": "其中哪个城市的退款率最高？",
+    "expected": {
+      "columns": [
+        "region",
+        "refund_rate_pct"
+      ],
+      "rows": [
+        ["Guangzhou", 5.56],
+        ["Shenzhen", 6.88]
+      ]
+    },
+    "category": "multiturn_analysis"
+  },
+  {
+    "id": "south_q2_context_sales_share",
+    "conversation_group": "south_q2_sales_share",
+    "question": "第二季度华南区销售额和退款率分别是多少？",
+    "expected": {
+      "columns": [
+        "sales_cents",
+        "refund_rate_pct"
+      ],
+      "rows": [
+        [
+          77000,
+          6.1
+        ]
+      ]
+    },
+    "category": "multiturn_analysis"
+  },
+  {
+    "id": "south_q2_guangzhou_sales_followup",
+    "conversation_group": "south_q2_sales_share",
+    "question": "广州销售额占华南区的比例是多少？",
+    "expected": {
+      "columns": [
+        "sales_share_pct"
+      ],
+      "rows": [
+        [
+          58.44
+        ]
+      ]
+    },
+    "category": "multiturn_analysis"
+  }
+]

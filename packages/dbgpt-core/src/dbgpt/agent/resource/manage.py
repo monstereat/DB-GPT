@@ -3,7 +3,7 @@
 import json
 import logging
 from collections import defaultdict
-from typing import Any, Dict, List, Optional, Type, Union, cast
+from typing import Any, Callable, Dict, List, Optional, Type, Union, cast
 
 from dbgpt._private.pydantic import BaseModel, ConfigDict, model_validator
 from dbgpt.component import BaseComponent, ComponentType, SystemApp
@@ -87,10 +87,19 @@ class ResourceManager(BaseComponent):
         self.system_app = system_app
         self._resources: Dict[str, RegisterResource] = {}
         self._type_to_resources: Dict[str, List[RegisterResource]] = defaultdict(list)
+        self._database_access_checker: Optional[Callable] = None
+        self._database_query_policy: Optional[Callable] = None
 
     def init_app(self, system_app: SystemApp):
         """Initialize the AgentManager."""
         self.system_app = system_app
+
+    def set_database_execution_hooks(
+        self, access_checker: Callable, query_policy: Callable
+    ):
+        """Set app-owned authorization hooks for request-scoped DB resources."""
+        self._database_access_checker = access_checker
+        self._database_query_policy = query_policy
 
     def after_start(self):
         """Register all resources."""
@@ -203,6 +212,7 @@ class ResourceManager(BaseComponent):
         type_unique_key: str,
         agent_resource: AgentResource,
         return_resource: bool = True,
+        trusted_execution_context: Optional[Dict[str, Any]] = None,
     ) -> Union[Resource, Dict[str, Any]]:
         """Return the resource by type."""
         item = self._type_to_resources.get(type_unique_key)
@@ -255,6 +265,16 @@ class ResourceManager(BaseComponent):
                 if not return_resource:
                     return param_dict
                 param_dict["system_app"] = self.system_app
+                if getattr(
+                    single_item.resource_cls,
+                    "requires_trusted_execution_context",
+                    False,
+                ):
+                    param_dict.update(
+                        trusted_execution_context=trusted_execution_context,
+                        access_checker=self._database_access_checker,
+                        query_policy=self._database_query_policy,
+                    )
                 resource_inst = single_item.resource_cls(**param_dict)
                 return resource_inst
             except Exception as e:
@@ -266,6 +286,7 @@ class ResourceManager(BaseComponent):
     def build_resource(
         self,
         agent_resources: Optional[List[AgentResource]] = None,
+        trusted_execution_context: Optional[Dict[str, Any]] = None,
     ) -> Optional[Resource]:
         """Build a resource.
 
@@ -284,7 +305,12 @@ class ResourceManager(BaseComponent):
         dependencies: List[Resource] = []
         for resource in agent_resources:
             resource_inst = cast(
-                Resource, self.build_resource_by_type(resource.type, resource)
+                Resource,
+                self.build_resource_by_type(
+                    resource.type,
+                    resource,
+                    trusted_execution_context=trusted_execution_context,
+                ),
             )
             dependencies.append(resource_inst)
         if len(dependencies) == 1:

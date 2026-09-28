@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Literal, Optional
 
 from dbgpt._private.pydantic import BaseModel, ConfigDict, Field
 
@@ -43,6 +43,11 @@ class DatasourceServeResponse(BaseModel):
     ext_config: Optional[Dict[str, Any]] = Field(
         None, description="Extra configuration for the datasource."
     )
+    approval_status: str = Field("pending", description="Datasource approval state.")
+    submitted_by: Optional[str] = Field(None, description="Requesting user id.")
+    approved_by: Optional[str] = Field(None, description="Approving admin user id.")
+    approved_at: Optional[str] = Field(None, description="Approval timestamp.")
+    approval_reason: Optional[str] = Field(None, description="Review reason.")
 
     gmt_created: Optional[str] = Field(
         None,
@@ -92,12 +97,27 @@ class DatasourceCreateRequest(BaseModel):
         }
 
 
+class DatasourceApprovalRequest(BaseModel):
+    decision: Literal["approve", "reject"]
+    reason: Optional[str] = None
+
+
+class DatasourceOwnerTransferRequest(BaseModel):
+    owner_id: str = Field(..., min_length=1, max_length=128)
+    reason: Optional[str] = Field(None, max_length=2000)
+
+
 class DatasourceQueryResponse(DatasourceCreateRequest):
-    """Response model for datasource query"""
+    """Datasource query response; privacy-tagged params are returned empty."""
 
     db_name: Optional[str] = Field(
         None, description="Internal database name used for connector lookup."
     )
+    approval_status: str = Field("pending", description="Datasource approval state.")
+    submitted_by: Optional[str] = Field(None, description="Requesting user id.")
+    approved_by: Optional[str] = Field(None, description="Approving admin user id.")
+    approved_at: Optional[str] = Field(None, description="Approval timestamp.")
+    approval_reason: Optional[str] = Field(None, description="Review reason.")
     gmt_created: Optional[str] = Field(
         None,
         description="The datasource created time.",

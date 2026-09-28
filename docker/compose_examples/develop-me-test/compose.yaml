@@ -1,0 +1,99 @@
+services:
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama-models:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
+
+  ollama-models:
+    image: ollama/ollama:latest
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["sh", "-c"]
+    command:
+      - ollama pull qwen3:1.7b && ollama pull qwen3-embedding:0.6b
+    restart: "no"
+
+  dbgpt:
+    image: dbgpt-develop-me-test:latest
+    command:
+      - dbgpt
+      - start
+      - webserver
+      - --config
+      - /app/configs/dbgpt-test-ollama.toml
+      - --yes
+    depends_on:
+      ollama-models:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:5671:5670"
+    volumes:
+      - ./config/dbgpt-test-ollama.toml:/app/configs/dbgpt-test-ollama.toml:ro
+      - ../../../examples/enterprise-text2sql/metric_catalog.json:/app/configs/ecommerce-metric-catalog.json:ro
+      - ../../../packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/agentic_data_api.py:/app/packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/agentic_data_api.py:ro
+      - ../../../packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/business_context.py:/app/packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/business_context.py:ro
+      - ../../../packages/dbgpt-serve/src/dbgpt_serve/datasource/api/endpoints.py:/app/packages/dbgpt-serve/src/dbgpt_serve/datasource/api/endpoints.py:ro
+      - ../../../packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/metric_query.py:/app/packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/metric_query.py:ro
+      - ../../../packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/sql_query.py:/app/packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/sql_query.py:ro
+      - ../../../packages/dbgpt-core/src/dbgpt/agent/expand/actions/react_action.py:/app/packages/dbgpt-core/src/dbgpt/agent/expand/actions/react_action.py:ro
+      - ../../../packages/dbgpt-core/src/dbgpt/agent/util/react_parser.py:/app/packages/dbgpt-core/src/dbgpt/agent/util/react_parser.py:ro
+      - ../../../packages/dbgpt-core/src/dbgpt/model/cluster/apiserver/api.py:/app/packages/dbgpt-core/src/dbgpt/model/cluster/apiserver/api.py:ro
+      - ../../../packages/dbgpt-core/src/dbgpt/model/proxy/llms/ollama.py:/app/packages/dbgpt-core/src/dbgpt/model/proxy/llms/ollama.py:ro
+      - dbgpt-meta:/app/pilot/meta_data
+      - dbgpt-data:/app/pilot/data
+      - dbgpt-message:/app/pilot/message
+      - ecommerce-fixture:/data:ro
+    environment:
+      DBGPT_LANG: zh
+      DBGPT_METRIC_CATALOG_FILES: '{"ecommerce-demo":"/app/configs/ecommerce-metric-catalog.json"}'
+      DBGPT_DATABASE_CONTEXT_FILES: '{"ecommerce-demo":"/app/examples/enterprise-text2sql/business_dictionary.md"}'
+      DBGPT_DATABASE_SCHEMA_FILES: '{"ecommerce-demo":"/app/examples/enterprise-text2sql/schema_metadata.json"}'
+      DBGPT_LOCAL_DEMO_DATASOURCES: '{"ecommerce-demo":"/data/ecommerce.sqlite"}'
+      DBGPT_LOCAL_DEMO_TENANT_ID: tenant-a
+      DBGPT_OLLAMA_DISABLE_THINKING: "true"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5670/', timeout=4)"
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 120s
+    restart: unless-stopped
+
+  fixture-seed:
+    image: dbgpt-develop-me-test:latest
+    profiles: [seed]
+    entrypoint: ["python"]
+    command:
+      - /app/examples/enterprise-text2sql/ecommerce_demo.py
+      - --database
+      - /data/ecommerce.sqlite
+    volumes:
+      - ecommerce-fixture:/data
+    restart: "no"
+
+volumes:
+  ollama-models:
+  dbgpt-meta:
+  dbgpt-data:
+  dbgpt-message:
+  ecommerce-fixture:
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 10.255.253.0/24

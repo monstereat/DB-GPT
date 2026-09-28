@@ -151,6 +151,113 @@ async def test_dispatch_runs_all_tasks_and_relays_text(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_dispatch_emits_child_spans_under_request_span(monkeypatch):
+    spans = []
+    ended = []
+
+    class _FakeTracer:
+        def get_current_span_id(self):
+            return "request-trace:parent-span"
+
+        def start_span(self, operation_name, **kwargs):
+            span = {"operation_name": operation_name, **kwargs}
+            spans.append(span)
+            return span
+
+        def end_span(self, span, **kwargs):
+            ended.append((span, kwargs))
+
+    def factory(idx, goal):
+        if idx == 1:
+            return _FakeAgent("", raise_exc=RuntimeError("child failed")), {}
+        return _FakeAgent("completed"), {"generated_images": []}
+
+    _patch_builder(monkeypatch, factory)
+    monkeypatch.setattr(disp, "root_tracer", _FakeTracer())
+    _, emit = _collector()
+    tool = make_dispatch_tool(
+        parent_conv_id="p", llm_client=_make_fake_llm_client(), emit_event=emit
+    )
+
+    await tool(
+        tasks=[
+            {"goal": "private task prompt one", "title": "Task One"},
+            {"goal": "private task prompt two", "title": "Task Two"},
+        ]
+    )
+
+    assert len(spans) == len(ended) == 2
+    assert all(span["operation_name"] == "agent.subagent_dispatch" for span in spans)
+    assert all(span["parent_span_id"] == "request-trace:parent-span" for span in spans)
+    assert all(span["span_type"] == disp.SpanType.AGENT for span in spans)
+    assert all(
+        set(span["metadata"]) == {"agent_id", "dispatch_batch_id", "subagent_index"}
+        for span in spans
+    )
+    assert all(
+        prompt not in json.dumps(span["metadata"])
+        for span in spans
+        for prompt in ("private task prompt one", "private task prompt two")
+    )
+    end_metadata = [kwargs["metadata"] for _, kwargs in ended]
+    assert {metadata["status"] for metadata in end_metadata} == {"done", "failed"}
+    assert all(isinstance(metadata["elapsed_ms"], int) for metadata in end_metadata)
+
+
+def test_dispatch_spans_share_trace_with_asgi_request(monkeypatch):
+    from starlette.applications import Starlette
+    from starlette.responses import JSONResponse
+    from starlette.testclient import TestClient
+
+    from dbgpt.component import SystemApp
+    from dbgpt.util.tracer import DefaultTracer, MemorySpanStorage, TracerManager
+    from dbgpt.util.tracer.tracer_middleware import TraceIDMiddleware
+
+    def factory(idx, goal):
+        return _FakeAgent(f"result-{idx}"), {"generated_images": []}
+
+    _patch_builder(monkeypatch, factory)
+    system_app = SystemApp()
+    span_storage = MemorySpanStorage(system_app)
+    system_app.register_instance(span_storage)
+    tracer = DefaultTracer(system_app)
+    system_app.register_instance(tracer)
+    tracer_manager = TracerManager()
+    tracer_manager.initialize(system_app)
+    monkeypatch.setattr(disp, "root_tracer", tracer_manager)
+    _, emit = _collector()
+    tool = make_dispatch_tool(
+        parent_conv_id="p", llm_client=_make_fake_llm_client(), emit_event=emit
+    )
+
+    app = Starlette()
+
+    async def dispatch_endpoint(_request):
+        result = await tool(
+            tasks=[{"goal": "safe test one"}, {"goal": "safe test two"}]
+        )
+        return JSONResponse({"result": result})
+
+    app.add_route("/api/dispatch", dispatch_endpoint, methods=["GET"])
+    traced_app = TraceIDMiddleware(app, tracer_manager._trace_context_var, tracer)
+    with TestClient(traced_app) as client:
+        response = client.get("/api/dispatch")
+
+    assert response.status_code == 200
+    ended_spans = [span for span in span_storage.spans if span.end_time is not None]
+    request_spans = [
+        span for span in ended_spans if span.operation_name == "DB-GPT-Web-Entry"
+    ]
+    child_spans = [
+        span for span in ended_spans if span.operation_name == "agent.subagent_dispatch"
+    ]
+    assert len(request_spans) == 1
+    assert len(child_spans) == 2
+    assert all(span.parent_span_id == request_spans[0].span_id for span in child_spans)
+    assert all(span.trace_id == request_spans[0].trace_id for span in child_spans)
+
+
+@pytest.mark.asyncio
 async def test_dispatch_summary_never_relays_react_envelope(monkeypatch):
     raw = """``````vis-thinking
 internal draft

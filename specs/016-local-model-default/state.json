@@ -1,0 +1,583 @@
+{
+  "schema_version": 2,
+  "change_id": "016-local-model-default",
+  "mode": "standard",
+  "status": "executing",
+  "current_task": "T002",
+  "waiting_for": null,
+  "artifacts": {
+    "spec": "specs/016-local-model-default/spec.md",
+    "plan": "specs/016-local-model-default/plan.md",
+    "tasks": "specs/016-local-model-default/tasks.md",
+    "verify": "specs/016-local-model-default/verify.md"
+  },
+  "controls": {
+    "commit_strategy": "none",
+    "branch": null,
+    "independent_review": "off"
+  },
+  "approvals": {
+    "spec": {
+      "at": "2026-09-26T21:26:50Z",
+      "approver": "主人（既有目标授权）",
+      "evidence": "用户授权在本地 Docker 测试环境修复截图问题；本机 qwen3:4b 实测约 12 分钟仍 missing_result，需回到快速模型验证 prompt 修复。",
+      "review_report": null
+    },
+    "plan": {
+      "at": "2026-09-26T21:26:51Z",
+      "approver": "主人（既有目标授权）",
+      "evidence": "既有用户授权允许按判断恢复本地快速模型，并验证原题；计划保留所有 Ollama 模型与数据卷。",
+      "review_report": null
+    },
+    "acceptance": null
+  },
+  "acceptance_criteria": {
+    "AC-01": {
+      "description": "Local Compose defaults to qwen3:1.7b and both services are healthy; qwen3:4b remains in the Ollama volume."
+    },
+    "AC-02": {
+      "description": "Screenshot q01 emits structured results and exact-matches gold; otherwise explicitly record the unresolved status."
+    }
+  },
+  "tasks": {
+    "T001": {
+      "depends_on": [],
+      "acceptance_criteria": [
+        "AC-01"
+      ],
+      "allowed_paths": [
+        "docker/compose_examples/develop-me-test/compose.yaml",
+        "docker/compose_examples/develop-me-test/config/dbgpt-test-ollama.toml",
+        "docker/compose_examples/develop-me-test/README.md",
+        "specs/016-local-model-default/**"
+      ],
+      "commands": [
+        "docker compose -p dbgpt-develop-me-test -f docker/compose_examples/develop-me-test/compose.yaml config --quiet",
+        "docker exec dbgpt-develop-me-test-ollama-1 ollama list",
+        "curl -fsS http://127.0.0.1:5671/api/health"
+      ],
+      "status": "done",
+      "check_ids": [
+        "T001-compose",
+        "T001-models",
+        "T001-health"
+      ],
+      "scope": {
+        "baseline": "/Users/monster/Documents/GitHub/code/DB-GPT/specs/016-local-model-default/scope-baseline-T001.json",
+        "cwd": "/Users/monster/Documents/GitHub/code/DB-GPT",
+        "internal_patterns": [
+          "specs/016-local-model-default/**"
+        ]
+      },
+      "scope_report": {
+        "path": "/Users/monster/Documents/GitHub/code/DB-GPT/specs/016-local-model-default/scope-report-T001.json",
+        "sha256": "81986f6a4506054e9456cf4d84128744cddd0d33511fbb7a017528c046df33b1"
+      }
+    },
+    "T002": {
+      "depends_on": [
+        "T001"
+      ],
+      "acceptance_criteria": [
+        "AC-02"
+      ],
+      "allowed_paths": [
+        "docs/develop-me-roadmap.md",
+        "specs/016-local-model-default/**"
+      ],
+      "commands": [
+        ".venv/bin/python -m json.tool specs/016-local-model-default/evidence/q01-scorecard.json",
+        ".venv/bin/python -c 'import json; d=json.load(open(\"specs/016-local-model-default/evidence/q01-scorecard.json\")); assert d[\"question_count\"] == 1; print(d[\"cases\"])'"
+      ],
+      "status": "in_progress",
+      "check_ids": [],
+      "scope": {
+        "baseline": "/Users/monster/Documents/GitHub/code/DB-GPT/specs/016-local-model-default/scope-baseline-T002.json",
+        "cwd": "/Users/monster/Documents/GitHub/code/DB-GPT",
+        "internal_patterns": [
+          "specs/016-local-model-default/**"
+        ]
+      }
+    }
+  },
+  "checks": [
+    {
+      "id": "T001-compose",
+      "type": "command",
+      "kind": "config",
+      "task": "T001",
+      "acceptance_criteria": [
+        "AC-01"
+      ],
+      "command": "docker compose -p dbgpt-develop-me-test -f docker/compose_examples/develop-me-test/compose.yaml config --quiet",
+      "cwd": "/Users/monster/Documents/GitHub/code/DB-GPT",
+      "started_at": "2026-09-26T21:27:16Z",
+      "duration_ms": 255,
+      "exit_code": 0,
+      "result": "pass",
+      "stdout_log": "specs/016-local-model-default/evidence/T001-compose.stdout.log",
+      "stderr_log": "specs/016-local-model-default/evidence/T001-compose.stderr.log",
+      "git": {
+        "head": "93da908aa2ba936909a70d7b083ab6455f8a0a85",
+        "changed_files": [
+          ".github/workflows/develop-me-sql-guard.yml",
+          ".gitignore",
+          "assets/schema/dbgpt.sql",
+          "assets/schema/upgrade/v0_8_2/upgrade_to_v0.8.2.sql",
+          "assets/schema/upgrade/v0_8_2/v0.8.2.sql",
+          "docker/base/Dockerfile",
+          "docs/develop-me-roadmap.md",
+          "examples/enterprise-text2sql/README.md",
+          "examples/enterprise-text2sql/ecommerce_demo.py",
+          "examples/enterprise-text2sql/evaluate_candidates.py",
+          "examples/enterprise-text2sql/gold_candidates.json",
+          "examples/enterprise-text2sql/guarded_query.py",
+          "examples/enterprise-text2sql/test_ecommerce_demo.py",
+          "examples/enterprise-text2sql/test_evaluate_candidates.py",
+          "examples/enterprise-text2sql/test_guarded_query.py",
+          "packages/dbgpt-app/hatch_build.py",
+          "packages/dbgpt-app/src/dbgpt_app/component_configs.py",
+          "packages/dbgpt-app/src/dbgpt_app/initialization/db_model_initialization.py",
+          "packages/dbgpt-app/src/dbgpt_app/initialization/workspace_provisioning.py",
+          "packages/dbgpt-app/src/dbgpt_app/knowledge/api.py",
+          "packages/dbgpt-app/src/dbgpt_app/knowledge/service.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/agentic_data_api.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/api_v1.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/editor/api_editor_v1.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/editor/service.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/editor/tests/test_chart_run.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/subagent/dispatcher.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/subagent/react_tools.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/subagent/tests/test_dispatch_tool.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/subagent/tests/test_dispatcher.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/subagent/tests/test_react_tools.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tests/test_agentic_data_api_lifecycle.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/__init__.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/code_interpreter.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/execute_analysis.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/execute_tool.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/html_interpreter.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/kb_tools.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/knowledge_retrieve.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/load_file.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/load_tools.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/question.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/read_file.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/select_skill.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/shell_interpreter.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/skill_tools.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/sql_query.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/tests/test_session_file_tools.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/todowrite.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v2.py",
+          "packages/dbgpt-app/src/dbgpt_app/scene/base_chat.py",
+          "packages/dbgpt-app/src/dbgpt_app/scene/chat_dashboard/chat.py",
+          "packages/dbgpt-app/src/dbgpt_app/scene/chat_dashboard/data_loader.py",
+          "packages/dbgpt-app/src/dbgpt_app/tests/test_agentic_multi_file_flow.py",
+          "packages/dbgpt-app/src/dbgpt_app/tests/test_agentic_multi_file_security.py",
+          "packages/dbgpt-app/src/dbgpt_app/tests/test_attachment_react_adapter.py",
+          "packages/dbgpt-core/pyproject.toml",
+          "packages/dbgpt-core/src/dbgpt/agent/resource/database.py",
+          "packages/dbgpt-core/src/dbgpt/agent/resource/manage.py",
+          "packages/dbgpt-core/src/dbgpt/agent/resource/tool/pack.py",
+          "packages/dbgpt-core/src/dbgpt/agent/resource/tool/tests/test_base_tool.py",
+          "packages/dbgpt-core/src/dbgpt/core/awel/trigger/http_trigger.py",
+          "packages/dbgpt-core/src/dbgpt/core/interface/operators/llm_operator.py",
+          "packages/dbgpt-core/src/dbgpt/datasource/rdbms/base.py",
+          "packages/dbgpt-core/src/dbgpt/model/operators/llm_operator.py",
+          "packages/dbgpt-core/src/dbgpt/model/proxy/llms/ollama.py",
+          "packages/dbgpt-core/src/dbgpt/model/utils/provider_test.py",
+          "packages/dbgpt-core/src/dbgpt/rag/extractor/summary.py",
+          "packages/dbgpt-core/src/dbgpt/rag/extractor/tests/test_summary_extractor.py",
+          "packages/dbgpt-core/src/dbgpt/rag/retriever/rewrite.py",
+          "packages/dbgpt-core/src/dbgpt/rag/transformer/llm_extractor.py",
+          "packages/dbgpt-core/src/dbgpt/util/tracer/tests/test_tracer_impl.py",
+          "packages/dbgpt-core/src/dbgpt/util/tracer/tracer_impl.py",
+          "packages/dbgpt-core/src/dbgpt/util/tracer/tracer_middleware.py",
+          "packages/dbgpt-ext/src/dbgpt_ext/datasource/conn_spark.py",
+          "packages/dbgpt-ext/src/dbgpt_ext/datasource/rdbms/conn_postgresql.py",
+          "packages/dbgpt-ext/src/dbgpt_ext/datasource/rdbms/tests/test_conn_sqlite.py",
+          "packages/dbgpt-serve/pyproject.toml",
+          "packages/dbgpt-serve/src/dbgpt_serve/agent/agents/app_agent_manage.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/agent/agents/controller.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/agent/agents/expand/actions/volatility_analysis_action.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/agent/resource/datasource.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/datasource/api/endpoints.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/datasource/api/schemas.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/datasource/manages/connect_config_db.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/datasource/manages/connector_manager.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/datasource/service/service.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/evaluate/api/endpoints.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/flow/api/endpoints.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/flow/tests/test_endpoints.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/prompt/api/endpoints.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/prompt/service/service.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/prompt/tests/test_endpoints.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/rag/api/endpoints.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/rag/retriever/knowledge_space.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/rag/service/service.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/rag/tests/test_service.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/utils/auth.py",
+          "uv.lock"
+        ],
+        "diff_sha256": "178933f871e0611b6d472bc596b81968571665cb81abaf637958d0579a27337c"
+      }
+    },
+    {
+      "id": "T001-models",
+      "type": "command",
+      "kind": "integration",
+      "task": "T001",
+      "acceptance_criteria": [
+        "AC-01"
+      ],
+      "command": "docker exec dbgpt-develop-me-test-ollama-1 ollama list",
+      "cwd": "/Users/monster/Documents/GitHub/code/DB-GPT",
+      "started_at": "2026-09-26T21:27:17Z",
+      "duration_ms": 108,
+      "exit_code": 0,
+      "result": "pass",
+      "stdout_log": "specs/016-local-model-default/evidence/T001-models.stdout.log",
+      "stderr_log": "specs/016-local-model-default/evidence/T001-models.stderr.log",
+      "git": {
+        "head": "93da908aa2ba936909a70d7b083ab6455f8a0a85",
+        "changed_files": [
+          ".github/workflows/develop-me-sql-guard.yml",
+          ".gitignore",
+          "assets/schema/dbgpt.sql",
+          "assets/schema/upgrade/v0_8_2/upgrade_to_v0.8.2.sql",
+          "assets/schema/upgrade/v0_8_2/v0.8.2.sql",
+          "docker/base/Dockerfile",
+          "docs/develop-me-roadmap.md",
+          "examples/enterprise-text2sql/README.md",
+          "examples/enterprise-text2sql/ecommerce_demo.py",
+          "examples/enterprise-text2sql/evaluate_candidates.py",
+          "examples/enterprise-text2sql/gold_candidates.json",
+          "examples/enterprise-text2sql/guarded_query.py",
+          "examples/enterprise-text2sql/test_ecommerce_demo.py",
+          "examples/enterprise-text2sql/test_evaluate_candidates.py",
+          "examples/enterprise-text2sql/test_guarded_query.py",
+          "packages/dbgpt-app/hatch_build.py",
+          "packages/dbgpt-app/src/dbgpt_app/component_configs.py",
+          "packages/dbgpt-app/src/dbgpt_app/initialization/db_model_initialization.py",
+          "packages/dbgpt-app/src/dbgpt_app/initialization/workspace_provisioning.py",
+          "packages/dbgpt-app/src/dbgpt_app/knowledge/api.py",
+          "packages/dbgpt-app/src/dbgpt_app/knowledge/service.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/agentic_data_api.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/api_v1.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/editor/api_editor_v1.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/editor/service.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/editor/tests/test_chart_run.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/subagent/dispatcher.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/subagent/react_tools.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/subagent/tests/test_dispatch_tool.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/subagent/tests/test_dispatcher.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/subagent/tests/test_react_tools.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tests/test_agentic_data_api_lifecycle.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/__init__.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/code_interpreter.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/execute_analysis.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/execute_tool.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/html_interpreter.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/kb_tools.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/knowledge_retrieve.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/load_file.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/load_tools.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/question.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/read_file.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/select_skill.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/shell_interpreter.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/skill_tools.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/sql_query.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/tests/test_session_file_tools.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/todowrite.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v2.py",
+          "packages/dbgpt-app/src/dbgpt_app/scene/base_chat.py",
+          "packages/dbgpt-app/src/dbgpt_app/scene/chat_dashboard/chat.py",
+          "packages/dbgpt-app/src/dbgpt_app/scene/chat_dashboard/data_loader.py",
+          "packages/dbgpt-app/src/dbgpt_app/tests/test_agentic_multi_file_flow.py",
+          "packages/dbgpt-app/src/dbgpt_app/tests/test_agentic_multi_file_security.py",
+          "packages/dbgpt-app/src/dbgpt_app/tests/test_attachment_react_adapter.py",
+          "packages/dbgpt-core/pyproject.toml",
+          "packages/dbgpt-core/src/dbgpt/agent/resource/database.py",
+          "packages/dbgpt-core/src/dbgpt/agent/resource/manage.py",
+          "packages/dbgpt-core/src/dbgpt/agent/resource/tool/pack.py",
+          "packages/dbgpt-core/src/dbgpt/agent/resource/tool/tests/test_base_tool.py",
+          "packages/dbgpt-core/src/dbgpt/core/awel/trigger/http_trigger.py",
+          "packages/dbgpt-core/src/dbgpt/core/interface/operators/llm_operator.py",
+          "packages/dbgpt-core/src/dbgpt/datasource/rdbms/base.py",
+          "packages/dbgpt-core/src/dbgpt/model/operators/llm_operator.py",
+          "packages/dbgpt-core/src/dbgpt/model/proxy/llms/ollama.py",
+          "packages/dbgpt-core/src/dbgpt/model/utils/provider_test.py",
+          "packages/dbgpt-core/src/dbgpt/rag/extractor/summary.py",
+          "packages/dbgpt-core/src/dbgpt/rag/extractor/tests/test_summary_extractor.py",
+          "packages/dbgpt-core/src/dbgpt/rag/retriever/rewrite.py",
+          "packages/dbgpt-core/src/dbgpt/rag/transformer/llm_extractor.py",
+          "packages/dbgpt-core/src/dbgpt/util/tracer/tests/test_tracer_impl.py",
+          "packages/dbgpt-core/src/dbgpt/util/tracer/tracer_impl.py",
+          "packages/dbgpt-core/src/dbgpt/util/tracer/tracer_middleware.py",
+          "packages/dbgpt-ext/src/dbgpt_ext/datasource/conn_spark.py",
+          "packages/dbgpt-ext/src/dbgpt_ext/datasource/rdbms/conn_postgresql.py",
+          "packages/dbgpt-ext/src/dbgpt_ext/datasource/rdbms/tests/test_conn_sqlite.py",
+          "packages/dbgpt-serve/pyproject.toml",
+          "packages/dbgpt-serve/src/dbgpt_serve/agent/agents/app_agent_manage.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/agent/agents/controller.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/agent/agents/expand/actions/volatility_analysis_action.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/agent/resource/datasource.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/datasource/api/endpoints.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/datasource/api/schemas.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/datasource/manages/connect_config_db.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/datasource/manages/connector_manager.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/datasource/service/service.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/evaluate/api/endpoints.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/flow/api/endpoints.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/flow/tests/test_endpoints.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/prompt/api/endpoints.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/prompt/service/service.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/prompt/tests/test_endpoints.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/rag/api/endpoints.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/rag/retriever/knowledge_space.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/rag/service/service.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/rag/tests/test_service.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/utils/auth.py",
+          "uv.lock"
+        ],
+        "diff_sha256": "178933f871e0611b6d472bc596b81968571665cb81abaf637958d0579a27337c"
+      }
+    },
+    {
+      "id": "T001-health",
+      "type": "command",
+      "kind": "integration",
+      "task": "T001",
+      "acceptance_criteria": [
+        "AC-01"
+      ],
+      "command": "curl -fsS http://127.0.0.1:5671/api/health",
+      "cwd": "/Users/monster/Documents/GitHub/code/DB-GPT",
+      "started_at": "2026-09-26T21:28:21Z",
+      "duration_ms": 11,
+      "exit_code": 0,
+      "result": "pass",
+      "stdout_log": "specs/016-local-model-default/evidence/T001-health.stdout.log",
+      "stderr_log": "specs/016-local-model-default/evidence/T001-health.stderr.log",
+      "git": {
+        "head": "93da908aa2ba936909a70d7b083ab6455f8a0a85",
+        "changed_files": [
+          ".github/workflows/develop-me-sql-guard.yml",
+          ".gitignore",
+          "assets/schema/dbgpt.sql",
+          "assets/schema/upgrade/v0_8_2/upgrade_to_v0.8.2.sql",
+          "assets/schema/upgrade/v0_8_2/v0.8.2.sql",
+          "docker/base/Dockerfile",
+          "docs/develop-me-roadmap.md",
+          "examples/enterprise-text2sql/README.md",
+          "examples/enterprise-text2sql/ecommerce_demo.py",
+          "examples/enterprise-text2sql/evaluate_candidates.py",
+          "examples/enterprise-text2sql/gold_candidates.json",
+          "examples/enterprise-text2sql/guarded_query.py",
+          "examples/enterprise-text2sql/test_ecommerce_demo.py",
+          "examples/enterprise-text2sql/test_evaluate_candidates.py",
+          "examples/enterprise-text2sql/test_guarded_query.py",
+          "packages/dbgpt-app/hatch_build.py",
+          "packages/dbgpt-app/src/dbgpt_app/component_configs.py",
+          "packages/dbgpt-app/src/dbgpt_app/initialization/db_model_initialization.py",
+          "packages/dbgpt-app/src/dbgpt_app/initialization/workspace_provisioning.py",
+          "packages/dbgpt-app/src/dbgpt_app/knowledge/api.py",
+          "packages/dbgpt-app/src/dbgpt_app/knowledge/service.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/agentic_data_api.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/api_v1.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/editor/api_editor_v1.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/editor/service.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/editor/tests/test_chart_run.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/subagent/dispatcher.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/subagent/react_tools.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/subagent/tests/test_dispatch_tool.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/subagent/tests/test_dispatcher.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/subagent/tests/test_react_tools.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tests/test_agentic_data_api_lifecycle.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/__init__.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/code_interpreter.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/execute_analysis.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/execute_tool.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/html_interpreter.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/kb_tools.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/knowledge_retrieve.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/load_file.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/load_tools.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/question.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/read_file.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/select_skill.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/shell_interpreter.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/skill_tools.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/sql_query.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/tests/test_session_file_tools.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v1/tools/todowrite.py",
+          "packages/dbgpt-app/src/dbgpt_app/openapi/api_v2.py",
+          "packages/dbgpt-app/src/dbgpt_app/scene/base_chat.py",
+          "packages/dbgpt-app/src/dbgpt_app/scene/chat_dashboard/chat.py",
+          "packages/dbgpt-app/src/dbgpt_app/scene/chat_dashboard/data_loader.py",
+          "packages/dbgpt-app/src/dbgpt_app/tests/test_agentic_multi_file_flow.py",
+          "packages/dbgpt-app/src/dbgpt_app/tests/test_agentic_multi_file_security.py",
+          "packages/dbgpt-app/src/dbgpt_app/tests/test_attachment_react_adapter.py",
+          "packages/dbgpt-core/pyproject.toml",
+          "packages/dbgpt-core/src/dbgpt/agent/resource/database.py",
+          "packages/dbgpt-core/src/dbgpt/agent/resource/manage.py",
+          "packages/dbgpt-core/src/dbgpt/agent/resource/tool/pack.py",
+          "packages/dbgpt-core/src/dbgpt/agent/resource/tool/tests/test_base_tool.py",
+          "packages/dbgpt-core/src/dbgpt/core/awel/trigger/http_trigger.py",
+          "packages/dbgpt-core/src/dbgpt/core/interface/operators/llm_operator.py",
+          "packages/dbgpt-core/src/dbgpt/datasource/rdbms/base.py",
+          "packages/dbgpt-core/src/dbgpt/model/operators/llm_operator.py",
+          "packages/dbgpt-core/src/dbgpt/model/proxy/llms/ollama.py",
+          "packages/dbgpt-core/src/dbgpt/model/utils/provider_test.py",
+          "packages/dbgpt-core/src/dbgpt/rag/extractor/summary.py",
+          "packages/dbgpt-core/src/dbgpt/rag/extractor/tests/test_summary_extractor.py",
+          "packages/dbgpt-core/src/dbgpt/rag/retriever/rewrite.py",
+          "packages/dbgpt-core/src/dbgpt/rag/transformer/llm_extractor.py",
+          "packages/dbgpt-core/src/dbgpt/util/tracer/tests/test_tracer_impl.py",
+          "packages/dbgpt-core/src/dbgpt/util/tracer/tracer_impl.py",
+          "packages/dbgpt-core/src/dbgpt/util/tracer/tracer_middleware.py",
+          "packages/dbgpt-ext/src/dbgpt_ext/datasource/conn_spark.py",
+          "packages/dbgpt-ext/src/dbgpt_ext/datasource/rdbms/conn_postgresql.py",
+          "packages/dbgpt-ext/src/dbgpt_ext/datasource/rdbms/tests/test_conn_sqlite.py",
+          "packages/dbgpt-serve/pyproject.toml",
+          "packages/dbgpt-serve/src/dbgpt_serve/agent/agents/app_agent_manage.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/agent/agents/controller.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/agent/agents/expand/actions/volatility_analysis_action.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/agent/resource/datasource.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/datasource/api/endpoints.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/datasource/api/schemas.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/datasource/manages/connect_config_db.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/datasource/manages/connector_manager.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/datasource/service/service.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/evaluate/api/endpoints.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/flow/api/endpoints.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/flow/tests/test_endpoints.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/prompt/api/endpoints.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/prompt/service/service.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/prompt/tests/test_endpoints.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/rag/api/endpoints.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/rag/retriever/knowledge_space.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/rag/service/service.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/rag/tests/test_service.py",
+          "packages/dbgpt-serve/src/dbgpt_serve/utils/auth.py",
+          "uv.lock"
+        ],
+        "diff_sha256": "178933f871e0611b6d472bc596b81968571665cb81abaf637958d0579a27337c"
+      }
+    },
+    {
+      "id": "T001-docker-healthy",
+      "type": "observation",
+      "task": "T001",
+      "acceptance_criteria": [
+        "AC-01"
+      ],
+      "observer": "Codex",
+      "evidence": "DB-GPT Docker health 为 healthy；ollama list 同时保留 qwen3:1.7b、qwen3:4b 和 embedding；qwen3:1.7b 是 TOML 中的当前 active model。",
+      "result": "pass",
+      "at": "2026-09-26T21:28:21Z"
+    }
+  ],
+  "events": [
+    {
+      "at": "2026-09-26T21:26:50Z",
+      "action": "init",
+      "status": "initialized",
+      "note": "State created."
+    },
+    {
+      "at": "2026-09-26T21:26:50Z",
+      "action": "set_draft",
+      "status": "spec_draft",
+      "note": "Restore the responsive 1.7B local model after measuring 4B latency."
+    },
+    {
+      "at": "2026-09-26T21:26:50Z",
+      "action": "add_criterion",
+      "status": "spec_draft",
+      "note": "Registered AC-01."
+    },
+    {
+      "at": "2026-09-26T21:26:50Z",
+      "action": "add_criterion",
+      "status": "spec_draft",
+      "note": "Registered AC-02."
+    },
+    {
+      "at": "2026-09-26T21:26:50Z",
+      "action": "approve",
+      "status": "spec_approved",
+      "note": "spec approved by 主人（既有目标授权）: 用户授权在本地 Docker 测试环境修复截图问题；本机 qwen3:4b 实测约 12 分钟仍 missing_result，需回到快速模型验证 prompt 修复。"
+    },
+    {
+      "at": "2026-09-26T21:26:50Z",
+      "action": "set_draft",
+      "status": "plan_draft",
+      "note": "Plan limits changes to local model config and a single q01 test."
+    },
+    {
+      "at": "2026-09-26T21:26:50Z",
+      "action": "add_task",
+      "status": "plan_draft",
+      "note": "Registered T001."
+    },
+    {
+      "at": "2026-09-26T21:26:51Z",
+      "action": "add_task",
+      "status": "plan_draft",
+      "note": "Registered T002."
+    },
+    {
+      "at": "2026-09-26T21:26:51Z",
+      "action": "approve",
+      "status": "plan_approved",
+      "note": "plan approved by 主人（既有目标授权）: 既有用户授权允许按判断恢复本地快速模型，并验证原题；计划保留所有 Ollama 模型与数据卷。"
+    },
+    {
+      "at": "2026-09-26T21:26:51Z",
+      "action": "start_task",
+      "status": "executing",
+      "note": "Started T001."
+    },
+    {
+      "at": "2026-09-26T21:27:17Z",
+      "action": "run_check",
+      "status": "executing",
+      "note": "T001-compose: pass (docker compose -p dbgpt-develop-me-test -f docker/compose_examples/develop-me-test/compose.yaml config --quiet)"
+    },
+    {
+      "at": "2026-09-26T21:27:17Z",
+      "action": "run_check",
+      "status": "executing",
+      "note": "T001-models: pass (docker exec dbgpt-develop-me-test-ollama-1 ollama list)"
+    },
+    {
+      "at": "2026-09-26T21:28:21Z",
+      "action": "run_check",
+      "status": "executing",
+      "note": "T001-health: pass (curl -fsS http://127.0.0.1:5671/api/health)"
+    },
+    {
+      "at": "2026-09-26T21:28:21Z",
+      "action": "record_observation",
+      "status": "executing",
+      "note": "T001-docker-healthy: pass by Codex"
+    },
+    {
+      "at": "2026-09-26T21:28:21Z",
+      "action": "complete_task",
+      "status": "executing",
+      "note": "Completed T001 with T001-compose, T001-models, T001-health."
+    },
+    {
+      "at": "2026-09-26T21:28:22Z",
+      "action": "start_task",
+      "status": "executing",
+      "note": "Started T002."
+    }
+  ],
+  "created_at": "2026-09-26T21:26:50Z",
+  "updated_at": "2026-09-26T21:28:22Z"
+}

@@ -6,15 +6,18 @@ from typing import Any, Dict
 
 from dbgpt.agent.resource.tool.base import tool
 
+from .tool_tracing import trace_agent_tool
+
 logger = logging.getLogger(__name__)
 
 
 def make_execute_tool(react_state: Dict[str, Any]):
     @tool(description="Execute a tool by name with JSON args.")
+    @trace_agent_tool("agent.execute_tool")
     async def execute_tool(tool_name: str, args: dict) -> str:
         from dbgpt._private.config import Config
+        from dbgpt.agent.resource.base import AgentResource, ResourceType
         from dbgpt.agent.resource.manage import get_resource_manager
-        from dbgpt.agent.resource.resource_api import AgentResource, ResourceType
         from dbgpt.agent.resource.tool.pack import ToolPack
 
         CFG = Config()

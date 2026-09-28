@@ -2,7 +2,9 @@
 
 import dataclasses
 from abc import ABC
-from typing import Any, AsyncIterator, Dict, List, Optional, Union, cast
+from contextlib import contextmanager
+from contextvars import ContextVar, Token
+from typing import Any, AsyncIterator, Callable, Dict, List, Optional, Union, cast
 
 from dbgpt._private.pydantic import BaseModel
 from dbgpt.core.awel import (
@@ -44,6 +46,51 @@ RequestInput = Union[
     ModelMessage,
     List[ModelMessage],
 ]
+
+
+class _LLMClientWrapperContext:
+    """Request-scoped client wrapper and cache of clients wrapped in that scope."""
+
+    def __init__(self, wrapper: Callable[[LLMClient], LLMClient]):
+        self.wrapper = wrapper
+        self.wrapped_clients: Dict[int, tuple[LLMClient, LLMClient]] = {}
+        self.wrapper_results: Dict[int, LLMClient] = {}
+
+
+_LLM_CLIENT_WRAPPER: ContextVar[Optional[_LLMClientWrapperContext]] = ContextVar(
+    "dbgpt_llm_client_wrapper", default=None
+)
+
+
+@contextmanager
+def scoped_llm_client_wrapper(wrapper: Callable[[LLMClient], LLMClient]):
+    """Install a server-controlled wrapper for LLM clients in the current context.
+
+    The wrapper is intentionally separate from ``ModelRequest`` and AWEL workflow
+    inputs so clients cannot supply or override its identity/configuration data.
+    """
+    token: Token = _LLM_CLIENT_WRAPPER.set(_LLMClientWrapperContext(wrapper))
+    try:
+        yield
+    finally:
+        _LLM_CLIENT_WRAPPER.reset(token)
+
+
+def wrap_llm_client_for_current_context(client: LLMClient) -> LLMClient:
+    """Wrap ``client`` with the server-installed wrapper, if one is active."""
+    wrapper_context = _LLM_CLIENT_WRAPPER.get()
+    if wrapper_context is None:
+        return client
+    client_key = id(client)
+    if wrapper_context.wrapper_results.get(client_key) is client:
+        return client
+    cached = wrapper_context.wrapped_clients.get(client_key)
+    if cached is not None and cached[0] is client:
+        return cached[1]
+    wrapped_client = wrapper_context.wrapper(client)
+    wrapper_context.wrapped_clients[client_key] = (client, wrapped_client)
+    wrapper_context.wrapper_results[id(wrapped_client)] = wrapped_client
+    return wrapped_client
 
 
 class RequestBuilderOperator(MapOperator[RequestInput, ModelRequest]):
@@ -305,7 +352,8 @@ class BaseLLMOperator(BaseLLM, MapOperator[ModelRequest, ModelOutput], ABC):
         await self.current_dag_context.save_to_share_data(
             self.SHARE_DATA_KEY_MODEL_NAME, request.model, overwrite=True
         )
-        model_output = await self.llm_client.generate(request)
+        llm_client = wrap_llm_client_for_current_context(self.llm_client)
+        model_output = await llm_client.generate(request)
         await self.save_model_output(self.current_dag_context, model_output)
         return model_output
 
@@ -344,7 +392,8 @@ class BaseStreamingLLMOperator(
             self.SHARE_DATA_KEY_MODEL_NAME, request.model, overwrite=True
         )
         model_output = None
-        async for output in self.llm_client.generate_stream(request):  # type: ignore
+        llm_client = wrap_llm_client_for_current_context(self.llm_client)
+        async for output in llm_client.generate_stream(request):  # type: ignore
             model_output = output
             yield output
         if model_output:

@@ -1,0 +1,27 @@
+{
+  "base_commit": "93da908aa2ba936909a70d7b083ab6455f8a0a85",
+  "baseline": "/Users/monster/Documents/GitHub/code/DB-GPT/specs/013-local-agent-model/scope-baseline-T001.json",
+  "new_files": [],
+  "modified_preexisting_files": [
+    "docker/compose_examples/develop-me-test/README.md",
+    "docker/compose_examples/develop-me-test/compose.yaml",
+    "docker/compose_examples/develop-me-test/config/dbgpt-test-ollama.toml"
+  ],
+  "touched_files": [
+    "docker/compose_examples/develop-me-test/README.md",
+    "docker/compose_examples/develop-me-test/compose.yaml",
+    "docker/compose_examples/develop-me-test/config/dbgpt-test-ollama.toml"
+  ],
+  "allow_patterns": [
+    "docker/compose_examples/develop-me-test/compose.yaml",
+    "docker/compose_examples/develop-me-test/config/dbgpt-test-ollama.toml",
+    "docker/compose_examples/develop-me-test/README.md",
+    "specs/013-local-agent-model/**"
+  ],
+  "internal_patterns": [
+    "specs/013-local-agent-model/**",
+    "specs/013-local-agent-model/scope-baseline-T001.json"
+  ],
+  "outside_scope": [],
+  "passed": true
+}

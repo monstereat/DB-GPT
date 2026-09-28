@@ -1,0 +1,26 @@
+{
+  "postgresql": {
+    "read_only_select": "SELECT order_id FROM orders",
+    "delete_statement": "DELETE FROM orders WHERE order_id = 1",
+    "write_cte": "WITH changed AS (DELETE FROM orders WHERE order_id = 1 RETURNING *) SELECT * FROM changed",
+    "row_lock": "SELECT * FROM orders FOR UPDATE",
+    "copy_export": "COPY orders TO '/tmp/orders.csv'",
+    "server_file_read": "SELECT pg_catalog.pg_read_file('/etc/passwd')",
+    "resource_sleep": "SELECT pg_sleep(1)",
+    "cross_session_notify": "SELECT pg_catalog.pg_notify('events', 'changed')",
+    "session_setting": "SELECT pg_catalog.set_config('search_path', 'public', false)",
+    "multiple_statements": "SELECT order_id FROM orders; SELECT order_id FROM orders"
+  },
+  "mysql": {
+    "read_only_select": "SELECT order_id FROM orders",
+    "delete_statement": "DELETE FROM orders WHERE order_id = 1",
+    "write_cte": "WITH changed AS (DELETE FROM orders WHERE order_id = 1 RETURNING *) SELECT * FROM changed",
+    "into_outfile": "SELECT order_id FROM orders INTO OUTFILE '/tmp/orders.csv'",
+    "load_file": "SELECT LOAD_FILE('/etc/passwd')",
+    "resource_sleep": "SELECT SLEEP(1)",
+    "named_lock": "SELECT GET_LOCK('analytics-report', 1)",
+    "benchmark": "SELECT BENCHMARK(1000, MD5('x'))",
+    "last_insert_id_expression": "SELECT LAST_INSERT_ID(123)",
+    "multiple_statements": "SELECT order_id FROM orders; SELECT order_id FROM orders"
+  }
+}

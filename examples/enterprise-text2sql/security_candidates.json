@@ -1,0 +1,21 @@
+{
+  "sensitive_column": "SELECT internal_note FROM orders",
+  "cross_tenant_column": "SELECT order_id FROM orders WHERE tenant_id = 'tenant-b'",
+  "write_statement": "DELETE FROM orders WHERE order_id = 1",
+  "syntax_error": "SELECT FROM orders",
+  "foreign_region_scope": "SELECT order_id FROM orders WHERE region_id = 'b-gz'",
+  "sensitive_aggregation": "SELECT MAX(email) FROM users",
+  "cte_table_shadow": "WITH orders AS (SELECT order_id FROM orders) SELECT * FROM orders",
+  "multiple_statements": "SELECT order_id FROM orders; SELECT order_id FROM orders",
+  "extension_function": "SELECT load_extension('blocked')",
+  "cte_hidden_column": "WITH hidden AS (SELECT internal_note FROM orders) SELECT COUNT(*) FROM hidden",
+  "recursive_cte": "WITH RECURSIVE sequence(value) AS (SELECT 1 UNION ALL SELECT value + 1 FROM sequence) SELECT SUM(value) FROM sequence",
+  "direct_main_table": "SELECT order_id FROM main.orders WHERE tenant_id = 'tenant-a'",
+  "pragma_schema_introspection": "PRAGMA table_info(orders)",
+  "sqlite_catalog_access": "SELECT name FROM sqlite_schema",
+  "sqlite_pragma_table_valued": "SELECT name FROM pragma_table_info('orders')",
+  "sqlite_file_read_function": "SELECT readfile('/no-such-dbgpt-guard-file')",
+  "sqlite_file_write_function": "SELECT writefile('', 'blocked')",
+  "sqlite_pragma_table_list": "SELECT name FROM pragma_table_list",
+  "sqlite_pragma_function_list": "SELECT name FROM pragma_function_list"
+}
